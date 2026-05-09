@@ -6,3 +6,4 @@ python-dotenv
 google-generativeai
 pydantic
 sqlalchemy
+pydantic-settings
