@@ -1,0 +1,57 @@
+{
+  "bot_response": "İşte verilen ürünlerin fiyat/performans analizi ve özeti:\n\n**Ürün Analizi ve Özet:**\n\nBu listede iPad ile ilgili üç farklı ürün bulunuyor:\n\n1.  **Alien Jailbreak iPad Game (eBay, 25.00 $):** Bu ürün bir oyun olarak tanıtılıyor ancak \"Jailbreak\" kelimesi, standart olmayan bir uygulama veya modifiye edilmiş bir sürüm olabileceğini ima ediyor. Fiyatı diğerlerine göre oldukça yüksek. Bu ürünün ne olduğu tam olarak net değil ve fiyatı göz önüne alındığında performans/fiyat oranı şüpheli görünüyor.\n\n2.  **iPad Games for Kids: Survival Guide (Barnes & Noble, 0.99 $):** Bu ürün, çocuklar için iPad oyunları hakkında bir rehber niteliğinde. Fiyatı çok uygun (sadece 0.99 $) ve ücretsiz kargo avantajı var. Çocuklar için oyun seçimi konusunda ebeveynlere veya kullanıcılara bilgi ve öneriler sunuyorsa, bu fiyatla oldukça yüksek bir performans sunabilir. Fiyatına göre en mantıklı seçeneklerden biri olarak öne çıkıyor.\n\n3.  **Gamevice Controller for iPad Mini (eBay, 9.95 $):** Bu ürün, iPad Mini için tasarlanmış bir oyun kumandası. İkinci el olarak mevcut ve 4.0 yıldız ve 2 inceleme ile ortalama bir puana sahip. 9.95 $ fiyat etiketiyle, oyun deneyimini geliştirmek isteyenler için düşünülebilir bir seçenek. Ancak ikinci el olması ve sınırlı inceleme sayısı, performansının garantisi açısından soru işaretleri yaratabilir.\n\n**Genel Özet:**\n\nVerilen ürünler arasında **\"iPad Games for Kids: Survival Guide\"** en dikkat çekici **fiyat/performans** oranına sahip ürün olarak öne çıkıyor. Çok düşük fiyatı ve sunduğu potansiyel bilgi içeriği ile cazip bir seçenek. Diğer iki ürün (oyun ve kumanda) ise fiyatları ve belirsizlikleri nedeniyle daha dikkatli değerlendirme gerektiriyor. Özellikle \"Alien Jailbreak iPad Game\"in tam olarak ne olduğu ve ne sunduğu net değil, bu da yüksek fiyatıyla bir risk unsuru oluşturuyor. Gamevice Controller ise ikinci el olması nedeniyle performansı ve dayanıklılığı açısından risk taşıyabilir.",
+  "found_products": [
+    {
+      "position": 1,
+      "title": "Alien Jailbreak Ipad Game",
+      "product_id": "10749015051991951749",
+      "product_link": "https://www.google.com/search?ibp=oshop&q=iPad, oyun, ders&prds=productid:10749015051991951749,headlineOfferDocid:10749015051991951749,imageDocid:15485023183779359590,pvt:hg&hl=en&gl=us&udm=28",
+      "immersive_product_page_token": "eyJlaSI6ImFmTUNhclQyTTRxMnB0UVBoZmVUNEFZIiwicHJvZHVjdGlkIjoiMTA3NDkwMTUwNTE5OTE5NTE3NDkiLCJjYXRhbG9naWQiOiIiLCJoZWFkbGluZU9mZmVyRG9jaWQiOiIxMDc0OTAxNTA1MTk5MTk1MTc0OSIsImltYWdlRG9jaWQiOiIxNTQ4NTAyMzE4Mzc3OTM1OTU5MCIsInJkcyI6IiIsInF1ZXJ5IjoiaVBhZCUyQytveXVuJTJDK2RlcnMiLCJncGNpZCI6IiIsIm1pZCI6IiIsInB2dCI6ImhnIiwidXVsZSI6IncrQ0FJUUlDSUdWSFZ5YTJWNSIsImdsIjoidXMiLCJobCI6ImVuIn0=",
+      "serpapi_immersive_product_api": "https://serpapi.com/search.json?engine=google_immersive_product&page_token=eyJlaSI6ImFmTUNhclQyTTRxMnB0UVBoZmVUNEFZIiwicHJvZHVjdGlkIjoiMTA3NDkwMTUwNTE5OTE5NTE3NDkiLCJjYXRhbG9naWQiOiIiLCJoZWFkbGluZU9mZmVyRG9jaWQiOiIxMDc0OTAxNTA1MTk5MTk1MTc0OSIsImltYWdlRG9jaWQiOiIxNTQ4NTAyMzE4Mzc3OTM1OTU5MCIsInJkcyI6IiIsInF1ZXJ5IjoiaVBhZCUyQytveXVuJTJDK2RlcnMiLCJncGNpZCI6IiIsIm1pZCI6IiIsInB2dCI6ImhnIiwidXVsZSI6IncrQ0FJUUlDSUdWSFZ5YTJWNSIsImdsIjoidXMiLCJobCI6ImVuIn0%3D",
+      "source": "eBay",
+      "source_icon": "https://serpapi.com/searches/6a02f369f357f610556baf9f/images/hRxoo6T-VMe8hl8mWF3xv87CY9QxbEoVcw9_Ts2s1sU.png",
+      "price": "$25.00",
+      "extracted_price": 25,
+      "thumbnail": "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcS9HCZEDHat7DlbcZAw4c9mKTZkn6J6BAhwBpzhIgCzFyxSSlIjDbtEPLIQEzqDuTA9YtVdC1b1NQdnsuaOrAbRBE8fXpbvhV7QYwg7zOqpIdAy4oOce8PJvQ",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/pxNpKHicDcnxDkJAHADgJ4ppLbS1dpxCjcQs_nN3chXn5FfiqXqd3qa-f7_vhwPIfqWqpaCPUULJZkDEXKl6KOBKFdo2as9bKa-i2nTr_61QwMwdjU3Xzh3sFqDjmtAcDQtqNvskv4ulv7QQHyw5ca-yp-34juPau2ECzvHgRc7U4WeCzAxSZmtECyIm-mcRPhA5WY5xOUvy4qkeZUOlT2EnPYbGRRvS0jj6r-gHp3E_SA"
+    },
+    {
+      "position": 2,
+      "title": "iPad Games for Kids: Survival Guide",
+      "product_id": "178331496103292102",
+      "product_link": "https://www.google.com/search?ibp=oshop&q=iPad, oyun, ders&prds=catalogid:178331496103292102,productid:12890719723485977362,headlineOfferDocid:18227504837018701420,imageDocid:10356310775729647098,gpcid:6631486222990510462,mid:576460832436977985,pvt:hg&hl=en&gl=us&udm=28",
+      "immersive_product_page_token": "eyJlaSI6ImFmTUNhclQyTTRxMnB0UVBoZmVUNEFZIiwicHJvZHVjdGlkIjoiMTI4OTA3MTk3MjM0ODU5NzczNjIiLCJjYXRhbG9naWQiOiIxNzgzMzE0OTYxMDMyOTIxMDIiLCJoZWFkbGluZU9mZmVyRG9jaWQiOiIxODIyNzUwNDgzNzAxODcwMTQyMCIsImltYWdlRG9jaWQiOiIxMDM1NjMxMDc3NTcyOTY0NzA5OCIsInJkcyI6IiIsInF1ZXJ5IjoiaVBhZCUyQytveXVuJTJDK2RlcnMiLCJncGNpZCI6IjY2MzE0ODYyMjI5OTA1MTA0NjIiLCJtaWQiOiI1NzY0NjA4MzI0MzY5Nzc5ODUiLCJwdnQiOiJoZyIsInV1bGUiOiJ3K0NBSVFJQ0lHVkhWeWEyVjUiLCJnbCI6InVzIiwiaGwiOiJlbiJ9",
+      "serpapi_immersive_product_api": "https://serpapi.com/search.json?engine=google_immersive_product&page_token=eyJlaSI6ImFmTUNhclQyTTRxMnB0UVBoZmVUNEFZIiwicHJvZHVjdGlkIjoiMTI4OTA3MTk3MjM0ODU5NzczNjIiLCJjYXRhbG9naWQiOiIxNzgzMzE0OTYxMDMyOTIxMDIiLCJoZWFkbGluZU9mZmVyRG9jaWQiOiIxODIyNzUwNDgzNzAxODcwMTQyMCIsImltYWdlRG9jaWQiOiIxMDM1NjMxMDc3NTcyOTY0NzA5OCIsInJkcyI6IiIsInF1ZXJ5IjoiaVBhZCUyQytveXVuJTJDK2RlcnMiLCJncGNpZCI6IjY2MzE0ODYyMjI5OTA1MTA0NjIiLCJtaWQiOiI1NzY0NjA4MzI0MzY5Nzc5ODUiLCJwdnQiOiJoZyIsInV1bGUiOiJ3K0NBSVFJQ0lHVkhWeWEyVjUiLCJnbCI6InVzIiwiaGwiOiJlbiJ9",
+      "source": "Barnes & Noble - Barnes and Noble - Heavy",
+      "source_icon": "https://serpapi.com/searches/6a02f369f357f610556baf9f/images/hRxoo6T-VMe8hl8mWF3xv3BJ0Kw9vKeElu2EUTTRyW0.png",
+      "price": "$0.99",
+      "extracted_price": 0.99,
+      "thumbnail": "https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcQDGMQbBiHYm_QnNivJQUuTlcgyjagRSY7ZvOaXaOFMYCe76e6XMXOanj9whrZqYYM7VDqOjYalVX4nGHvMc6stmQFjmIZa",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/mVy34XicDcnbCoIwAADQL0ohQlGI6IJaMMe6yOZLzDnmhpvTLcMf6d_6mzqv5_vpvLcuDUNu2LRYz9uVb8w6EM5TL1nABh26brBWGrEbt_9L92Wb5AydcoCagyyIfiJTyvmCHq97z8SiqLjeSFzPkGIKM0COPI54hAGG1Kjk3U31SAiIq9MIFaF9hTcmL2bAIuc1ypQ-1_QH0_o23A",
+      "delivery": "Free delivery"
+    },
+    {
+      "position": 3,
+      "title": "Gamevice Controller for iPad Mini",
+      "product_id": "8356884747678861207",
+      "product_link": "https://www.google.com/search?ibp=oshop&q=iPad, oyun, ders&prds=catalogid:8356884747678861207,productid:1519072491682548196,headlineOfferDocid:454787854911537586,imageDocid:989458994094404981,rds:PC_14837474584401397787|PROD_PC_14837474584401397787,gpcid:14837474584401397787,pvt:hg&hl=en&gl=us&udm=28",
+      "immersive_product_page_token": "eyJlaSI6ImFmTUNhclQyTTRxMnB0UVBoZmVUNEFZIiwicHJvZHVjdGlkIjoiMTUxOTA3MjQ5MTY4MjU0ODE5NiIsImNhdGFsb2dpZCI6IjgzNTY4ODQ3NDc2Nzg4NjEyMDciLCJoZWFkbGluZU9mZmVyRG9jaWQiOiI0NTQ3ODc4NTQ5MTE1Mzc1ODYiLCJpbWFnZURvY2lkIjoiOTg5NDU4OTk0MDk0NDA0OTgxIiwicmRzIjoiUENfMTQ4Mzc0NzQ1ODQ0MDEzOTc3ODd8UFJPRF9QQ18xNDgzNzQ3NDU4NDQwMTM5Nzc4NyIsInF1ZXJ5IjoiaVBhZCUyQytveXVuJTJDK2RlcnMiLCJncGNpZCI6IjE0ODM3NDc0NTg0NDAxMzk3Nzg3IiwibWlkIjoiIiwicHZ0IjoiaGciLCJ1dWxlIjoidytDQUlRSUNJR1ZIVnlhMlY1IiwiZ2wiOiJ1cyIsImhsIjoiZW4ifQ==",
+      "serpapi_immersive_product_api": "https://serpapi.com/search.json?engine=google_immersive_product&page_token=eyJlaSI6ImFmTUNhclQyTTRxMnB0UVBoZmVUNEFZIiwicHJvZHVjdGlkIjoiMTUxOTA3MjQ5MTY4MjU0ODE5NiIsImNhdGFsb2dpZCI6IjgzNTY4ODQ3NDc2Nzg4NjEyMDciLCJoZWFkbGluZU9mZmVyRG9jaWQiOiI0NTQ3ODc4NTQ5MTE1Mzc1ODYiLCJpbWFnZURvY2lkIjoiOTg5NDU4OTk0MDk0NDA0OTgxIiwicmRzIjoiUENfMTQ4Mzc0NzQ1ODQ0MDEzOTc3ODd8UFJPRF9QQ18xNDgzNzQ3NDU4NDQwMTM5Nzc4NyIsInF1ZXJ5IjoiaVBhZCUyQytveXVuJTJDK2RlcnMiLCJncGNpZCI6IjE0ODM3NDc0NTg0NDAxMzk3Nzg3IiwibWlkIjoiIiwicHZ0IjoiaGciLCJ1dWxlIjoidytDQUlRSUNJR1ZIVnlhMlY1IiwiZ2wiOiJ1cyIsImhsIjoiZW4ifQ%3D%3D",
+      "source": "eBay",
+      "source_icon": "https://serpapi.com/searches/6a02f369f357f610556baf9f/images/hRxoo6T-VMe8hl8mWF3xv9d7bi2jzx7Oui6AIzQtTos.png",
+      "multiple_sources": true,
+      "price": "$9.95",
+      "extracted_price": 9.95,
+      "second_hand_condition": "pre-owned",
+      "rating": 4,
+      "reviews": 2,
+      "thumbnail": "https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcTHksxVb85zq3R605He7DVyrK3MH5es-AIpI0xkIjdg-3ld8Knb4SVsCkf72uPe1eKZvY7viv9rx0eNdAoLIk6tknrAa9jUGEFRCGe1zEnzV73oiJnyD9aMKw",
+      "serpapi_thumbnail": "https://serpapi.com/images/url/SyfLkXicDcnbEkJAAADQL3JLrjNNYxAS06jM1Bt2Y22tZTfhq_qd_qbO6_l-Gs4psyUJkmqYKYdA4CVRxJrxgqNKrLqnxJqOUkTqbb_5n-2kwAqqc4jZlJemtvRqpstaCA0vn4dYTUINMsGJaCRPOGpBLagPYMakXJ9y5uK7sXodoQLj23g1RjRawyTDFDjdIcI6x2RwCqu9BP4ucwOoLD5ZckPt0J7MnlUk8fsHaKs-LQ"
+    }
+  ],
+  "steps_taken": [
+    "Yeni bir iPad almak istiyorum. Hem üniversitede not tutmak için (kalem desteği önemli) hem de boş zamanlarımda yüksek grafikli oyunlar oynamak için uygun bir model arıyorum. Bütçem maksimum 25.000 TL, öğrenci indirimi olan veya fiyat/performans canavarı bir model önerir misin?",
+    "Gerçek veriler çekildi: iPad, oyun, ders",
+    "Analiz tamamlandı."
+  ]
+}
