@@ -7,3 +7,8 @@ google-generativeai
 pydantic
 sqlalchemy
 pydantic-settings
+sqlalchemy
+alembic
+python-jose
+pydantic[email]
+bcrypt
