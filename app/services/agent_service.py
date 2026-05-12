@@ -1,12 +1,9 @@
 from typing import TypedDict, Annotated, List
 import operator
-import google.generativeai as genai
+import httpx
 from langgraph.graph import StateGraph, END
 from app.core.config import settings
-
-# Gemini Configuration
-genai.configure(api_key=settings.GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-2.5-flash-lite')
+from app.services.gemini_service import get_keywords_from_gemini, analyze_product_performances
 
 class AgentState(TypedDict):
     messages: Annotated[List[str], operator.add]
@@ -16,31 +13,42 @@ class AgentState(TypedDict):
 # --- NODES ---
 
 async def searcher_node(state: AgentState):
-    # Gemini burada "Arama Stratejisti" rolünde
     user_msg = state["messages"][-1]
-    prompt = f"Kullanıcı şunu arıyor: '{user_msg}'. Bu arama için en iyi 3 teknik anahtar kelimeyi virgülle ayırarak yaz."
     
-    response = await model.generate_content_async(prompt)
-    keywords = response.text
-    
-    # Şimdilik örnek veri, ileride SerpApi buraya gelecek
-    mock_products = [
-        {"name": "Profesyonel Koşu Ayakkabısı", "price": "2100 TL", "desc": "Karbon taban"},
-        {"name": "Günlük Yürüyüş Ayakkabısı", "price": "1200 TL", "desc": "Hafif yapı"}
-    ]
-    return {
-        "products": mock_products, 
-        "messages": [f"Aranan kelimeler: {keywords}. Ürünler listelendi."]
+    keywords = await get_keywords_from_gemini(user_msg) 
+
+    params = {
+        "engine": "google_shopping",
+        "q": keywords,
+        "api_key": settings.SERP_API_KEY,
+        "hl": "tr",
+        "gl": "tr",
+        "location": "Turkey"
     }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://serpapi.com/search", params=params)
+        raw_results = response.json().get("shopping_results", [])[:3] 
+    
+    clean_products = []
+    for item in raw_results:
+        clean_products.append({
+            "title": item.get("title"),
+            "price": item.get("extracted_price"),
+            "source": item.get("source"),
+            "link": item.get("product_link"),
+            "thumbnail": item.get("thumbnail")
+        })
+    
+    return {"products": clean_products, "messages": [f"Aranan terim: {keywords}"]}
 
 async def analyst_node(state: AgentState):
     products_info = str(state["products"])
-    prompt = f"Şu ürünleri fiyat/performans açısından analiz et ve kısa bir özet çıkar: {products_info}"
+    response = await analyze_product_performances(products_info)
     
-    response = await model.generate_content_async(prompt)
-    return {"analysis": response.text, "messages": ["Analiz tamamlandı."]}
+    return {"analysis": response, "messages": ["Analiz tamamlandı."]}
 
-#Graphic Setup
+# --- GRAPH SETUP ---
 
 workflow = StateGraph(AgentState)
 workflow.add_node("searcher", searcher_node)
