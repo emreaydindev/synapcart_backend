@@ -21,3 +21,12 @@ async def analyze_product_performances(products_info: str):
     prompt = f"Şu ürünleri fiyat/performans açısından analiz et ve kısa bir özet çıkar: {products_info}"
     response = await model.generate_content_async(prompt)
     return response.text
+
+async def is_shopping_related(user_msg: str) -> bool:
+    prompt = f"""Kullanıcının şu mesajını analiz et: '{user_msg}'
+    Bu mesaj alışveriş, ürün fiyatı, hediye önerisi, teknolojik aletler veya bir şeyler satın alma ile mi ilgili?
+    Eğer ilgiliyse SADECE 'yes' yaz, değilse SADECE 'no' yaz."""
+    
+    response = await model.generate_content_async(prompt)
+    decision = response.text.strip().lower()
+    return "yes" in decision

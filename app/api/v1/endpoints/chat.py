@@ -1,45 +1,83 @@
-from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, Depends, HTTPException
-from app.api.deps import get_current_user_optional
+from app.core.database import get_db
+from app.api.deps import get_current_user_required
 from app.models.user import User
-from app.services.gemini_service import get_chat_response
+from app.models.chat import ChatSession, ChatMessage
 from app.services.agent_service import app_agent
 from pydantic import BaseModel
+
+from app.services.chat_service import save_message
 
 router = APIRouter()
 
 class ChatRequest(BaseModel):
     message: str
 
-@router.post("/gemini")
-async def chat_with_ai(request: ChatRequest):
-    try:
-        response = await get_chat_response(request.message)
-        return {"response": response}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/agent")
+@router.post("/agent/{session_id}")
 async def chat_with_agent(
+    session_id: int,
     request: ChatRequest,
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
 ):
-    user_status = f"User: {current_user.email}" if current_user else "Guest Session"
-    print(f"--- Chat started by {user_status} ---")
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id, 
+        ChatSession.user_id == current_user.id
+    ).first()
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Sohbet oturumu bulunamadı veya bu oturuma erişim yetkiniz yok."
+        )
+
+    past_messages = db.query(ChatMessage).filter(
+        ChatMessage.session_id == session_id
+    ).order_by(ChatMessage.created_at.desc()).limit(6).all()
+    
+    history = []
+    for m in reversed(past_messages):
+        role_label = "Kullanıcı" if m.role == "user" else "Asistan"
+        history.append(f"{role_label}: {m.content}")
+
+    history.append(request.message)
 
     initial_state = {
-        "messages": [request.message],
+        "messages": history,
+        "user_object": current_user,
         "products": [],
-        "analysis": ""
+        "analysis": "",
+        "status": "searching"
     }
+
+    try:
+        result = await app_agent.ainvoke(initial_state)
+        
+        save_message(db, session_id, "user", request.message)
+        save_message(db, session_id, "assistant", result["analysis"])
+
+        if "user_object" in result:
+            del result["user_object"]
+            
+        return result
+
+    except Exception as e:
+        print(f"Agent Error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Ajan işlemi sırasında bir hata oluştu."
+        )
     
-    result = await app_agent.ainvoke(initial_state)
-    
-    # TODO: Eğer current_user varsa, bu chat veri tabanına kaydedilebilir.
-    
-    return {
-        "bot_response": result["analysis"],
-        "found_products": result["products"],
-        "is_logged_in": current_user is not None
-    }
+@router.get("/sessions")
+def list_sessions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
+    return db.query(ChatSession).filter(ChatSession.user_id == current_user.id).all()
+
+@router.post("/sessions")
+def create_session(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
+    new_session = ChatSession(user_id=current_user.id, title="Yeni Sohbet")
+    db.add(new_session)
+    db.commit()
+    db.refresh(new_session)
+    return new_session
