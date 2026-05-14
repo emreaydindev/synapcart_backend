@@ -16,3 +16,4 @@ class User(Base):
     currency = Column(String, default="TRY")
     
     favorites = relationship("Favorite", back_populates="owner", cascade="all, delete-orphan")
+    chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")

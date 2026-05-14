@@ -70,9 +70,11 @@ async def searcher_node(state: AgentState):
     }
 
 async def router_node(state: AgentState):
-    """Gelen mesajın alışverişle ilgili olup olmadığını kontrol eder."""
     last_message = state["messages"][-1]
-    is_related = await is_shopping_related(last_message)
+    
+    message_text = last_message.content if hasattr(last_message, 'content') else last_message
+    
+    is_related = await is_shopping_related(message_text)
     
     if is_related:
         return "searcher"
