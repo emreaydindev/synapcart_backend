@@ -25,3 +25,10 @@ class UserResponse(UserBase):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+class PasswordReset(BaseModel):
+    token: str
+    new_password: str

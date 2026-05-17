@@ -12,3 +12,6 @@ alembic
 python-jose
 pydantic[email]
 bcrypt
+python-multipart  # Form data
+aiosmtplib  # Sending email
+email-validator  # Email validation

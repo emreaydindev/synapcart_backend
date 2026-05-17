@@ -12,6 +12,7 @@ class ChatSession(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="chat_sessions")
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
@@ -23,4 +24,3 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     session = relationship("ChatSession", back_populates="messages")
-    user = relationship("User", back_populates="chat_sessions")

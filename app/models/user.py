@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String
+from sqlalchemy import Column, DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -17,3 +17,6 @@ class User(Base):
     
     favorites = relationship("Favorite", back_populates="owner", cascade="all, delete-orphan")
     chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
+
+    reset_token = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
