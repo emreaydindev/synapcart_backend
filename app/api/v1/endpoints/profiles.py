@@ -19,7 +19,9 @@ def update_profile(
 ):
     update_data = user_update.model_dump(exclude_unset=True)
     
-    for key, value in update_data.items():
+    safe_update_data = {k: v for k, v in update_data.items() if v is not None}
+    
+    for key, value in safe_update_data.items():
         setattr(current_user, key, value)
     
     db.add(current_user)
