@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserResponse, Token, PasswordResetRequest, PasswordReset
+from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, PasswordResetRequest, PasswordReset
 from app.core.security import get_password_hash, verify_password, create_access_token, generate_reset_token, send_reset_email
 
 router = APIRouter()
@@ -27,7 +27,7 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 @router.post("/login", response_model=Token)
-def login(user_in: UserCreate, db: Session = Depends(get_db)):
+def login(user_in: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_in.email).first()
     if not user or not verify_password(user_in.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Hatalı email veya şifre.")

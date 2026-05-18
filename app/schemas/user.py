@@ -5,8 +5,12 @@ from pydantic import BaseModel, EmailStr
 class UserBase(BaseModel):
     email: EmailStr
 
+class UserLogin(UserBase):
+    password: str
+
 class UserCreate(UserBase):
     password: str
+    name: str
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -25,6 +29,7 @@ class UserResponse(UserBase):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    user_name: Optional[str] = None
 
 class PasswordResetRequest(BaseModel):
     email: str
