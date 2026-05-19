@@ -12,5 +12,5 @@ class Favorite(Base):
     link = Column(String)
     thumbnail = Column(String)
     
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(String, ForeignKey("users.id"))
     owner = relationship("User", back_populates="favorites")
