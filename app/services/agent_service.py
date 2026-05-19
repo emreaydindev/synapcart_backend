@@ -11,12 +11,56 @@ from app.services.gemini_service import (
 )
 from app.services.search_service import get_serp_params
 
+import asyncio
+from typing import AsyncGenerator, Dict, Any
+
 class AgentState(TypedDict):
     messages: Annotated[List[str], operator.add]
     products: List[dict]
     analysis: str
     user_object: Optional[User]
     status: str        # 'searching', 'out_of_scope', 'completed'
+
+async def stream_agent_invoke(initial_state: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
+    """
+    Basit streaming wrapper:
+    - router_node ile karar alınır (searcher veya refusal)
+    - searcher çalışırsa ara products ile bir ara durum yayınlanır
+    - daha sonra analyst çalışır ve final gönderilir
+    """
+    decision = await router_node(initial_state)
+    yield {"status": "routing", "analysis": f"Router karar verdi: {decision}"}
+
+    if decision == "searcher":
+        yield {"status": "searching", "analysis": "Arama yapılıyor..."}
+        search_result = await searcher_node(initial_state)
+        yield {
+            "status": "searching",
+            "products": search_result.get("products", []),
+            "analysis": "Arama sonuçları alındı."
+        }
+
+        yield {"status": "thinking", "analysis": "Sonuçlar analiz ediliyor..."}
+        analysis_result = await analyst_node({**initial_state, **search_result})
+        yield {
+            "status": analysis_result.get("status", "completed"),
+            "analysis": analysis_result.get("analysis", ""),
+            "products": search_result.get("products", [])
+        }
+        return
+
+    if decision == "refusal":
+        yield {"status": "thinking", "analysis": "Uygun mu diye kontrol ediliyor..."}
+        refusal = await refusal_node(initial_state)
+        yield {"status": refusal.get("status", "out_of_scope"), "analysis": refusal.get("analysis", "")}
+        return
+
+    # fallback: call compiled agent
+    try:
+        result = await app_agent.ainvoke(initial_state)
+        yield {"status": result.get("status", "completed"), "analysis": result.get("analysis", ""), "products": result.get("products", [])}
+    except Exception:
+        raise
 
 # --- NODES ---
 
@@ -44,30 +88,33 @@ async def refusal_node(state: AgentState):
 async def searcher_node(state: AgentState):
     user_msg = state["messages"][-1]
     
-    keywords = await get_keywords_from_gemini(user_msg) 
-
-    params = get_serp_params(keywords, state.get("user_object"))
-    params["api_key"] = settings.SERP_API_KEY
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get("https://serpapi.com/search", params=params)
-        raw_results = response.json().get("shopping_results", [])[:3]
-    
-    clean_products = []
-    for item in raw_results:
-        clean_products.append({
-            "title": item.get("title"),
-            "price": item.get("extracted_price"),
-            "source": item.get("source"),
-            "link": item.get("product_link"),
-            "thumbnail": item.get("thumbnail")
-        })
-    
-    return {
-        "products": clean_products, 
-        "messages": [f"Aranan terim: {keywords}"],
-        "status": "searching"
-    }
+    try:
+        keywords = await get_keywords_from_gemini(user_msg) 
+        params = get_serp_params(keywords, state.get("user_object"))
+        params["api_key"] = settings.SERP_API_KEY
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get("https://serpapi.com/search", params=params)
+            raw_results = response.json().get("shopping_results", [])[:3]
+        
+        clean_products = []
+        for item in raw_results:
+            clean_products.append({
+                "title": item.get("title"),
+                "price": item.get("extracted_price"),
+                "source": item.get("source"),
+                "link": item.get("product_link"),
+                "thumbnail": item.get("thumbnail")
+            })
+        
+        return {
+            "products": clean_products, 
+            "messages": [f"Aranan terim: {keywords}"],
+            "status": "searching"
+        }
+    except Exception as e:
+        print(f"Searcher Node Error: {str(e)}")
+        raise
 
 async def router_node(state: AgentState):
     last_message = state["messages"][-1]

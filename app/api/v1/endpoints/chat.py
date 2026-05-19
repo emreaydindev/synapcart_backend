@@ -10,6 +10,12 @@ from pydantic import BaseModel
 
 from app.services.chat_service import save_message
 
+from fastapi.responses import StreamingResponse
+import json
+import asyncio
+
+from app.services.agent_service import stream_agent_invoke
+
 router = APIRouter()
 
 class ChatRequest(BaseModel):
@@ -81,3 +87,53 @@ def create_session(db: Session = Depends(get_db), current_user: User = Depends(g
     db.commit()
     db.refresh(new_session)
     return new_session
+
+@router.post("/agent/{session_id}/stream")
+async def stream_chat_with_agent(
+    session_id: int,
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_required)
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sohbet oturumu bulunamadı veya bu oturuma erişim yetkiniz yok.")
+
+    past_messages = db.query(ChatMessage).filter(
+        ChatMessage.session_id == session_id
+    ).order_by(ChatMessage.created_at.desc()).limit(6).all()
+
+    history = []
+    for m in reversed(past_messages):
+        role_label = "Kullanıcı" if m.role == "user" else "Asistan"
+        history.append(f"{role_label}: {m.content}")
+
+    history.append(request.message)
+
+    initial_state = {
+        "messages": history,
+        "user_object": current_user,
+        "products": [],
+        "analysis": "",
+        "status": "searching"
+    }
+
+    async def event_generator():
+        try:
+            async for partial in stream_agent_invoke(initial_state):
+                yield f"data: {json.dumps(partial, default=str)}\n\n"
+            await asyncio.sleep(0)
+        except Exception as e:
+            print(f"Streaming Agent Error: {str(e)}")
+            err = {
+                "status": "error", 
+                "analysis": f"Bağlantı hatası oluştu: {str(e)}",
+                "products": []
+            }
+            yield f"data: {json.dumps(err)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
