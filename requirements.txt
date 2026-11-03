@@ -1,18 +1,25 @@
-fastapi
-uvicorn
-langchain-google-genai
-langgraph
-python-dotenv
-google-generativeai
-pydantic
-sqlalchemy
-pydantic-settings
-sqlalchemy
-alembic
-python-jose
-pydantic[email]
-bcrypt
-python-multipart  # Form data
-aiosmtplib  # Sending email
-email-validator  # Email validation
-psycopg2-binary
+# Web
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.33
+slowapi==0.1.10
+
+# Data
+SQLAlchemy==2.1.6
+alembic==1.20.1
+psycopg2-binary==2.9.13
+pydantic[email]==2.14.2
+pydantic-settings==2.16.2
+email-validator==2.3.0
+
+# Auth
+python-jose[cryptography]==3.5.0
+bcrypt==5.0.0
+
+# AI / search
+langgraph==1.2.19
+google-genai==2.34.0
+httpx==0.28.1
+
+# Email
+aiosmtplib==5.1.3

@@ -1,165 +1,148 @@
-from typing import TypedDict, Annotated, List, Optional, Literal
-import operator
-import httpx
-from langgraph.graph import StateGraph, END
-from app.core.config import settings
-from app.models.user import User
-from app.services.gemini_service import (
-    get_keywords_from_gemini, 
-    analyze_product_performances, 
-    is_shopping_related
-)
-from app.services.search_service import get_serp_params
+"""Shopping agent: router -> (searcher -> analyst) | refusal.
 
-import asyncio
-from typing import AsyncGenerator, Dict, Any
+The compiled graph is the single implementation. `stream_agent` runs the same
+graph with `astream` and maps node completions to the SSE events the mobile
+app consumes ({status, analysis?, products?}).
+"""
+import logging
+from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, TypedDict
 
-class AgentState(TypedDict):
-    messages: Annotated[List[str], operator.add]
+from langgraph.graph import END, StateGraph
+
+from app.services import gemini_service
+from app.services.search_service import search_products
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_MAX_PRODUCTS = 3
+
+
+class AgentState(TypedDict, total=False):
+    # Inputs
+    question: str
+    history: List[str]
+    user_name: str
+    language: str
+    currency: str
+    max_products: int
+    analyst_model: str
+    # Outputs
+    route: Literal["searcher", "refusal"]
+    search_query: str
     products: List[dict]
     analysis: str
-    user_object: Optional[User]
-    status: str        # 'searching', 'out_of_scope', 'completed'
+    status: str  # 'searching' | 'completed' | 'out_of_scope'
 
-async def stream_agent_invoke(initial_state: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    Basit streaming wrapper:
-    - router_node ile karar alınır (searcher veya refusal)
-    - searcher çalışırsa ara products ile bir ara durum yayınlanır
-    - daha sonra analyst çalışır ve final gönderilir
-    """
-    decision = await router_node(initial_state)
-    yield {"status": "routing", "analysis": f"Router karar verdi: {decision}"}
 
-    if decision == "searcher":
-        yield {"status": "searching", "analysis": "Arama yapılıyor..."}
-        search_result = await searcher_node(initial_state)
-        yield {
-            "status": "searching",
-            "products": search_result.get("products", []),
-            "analysis": "Arama sonuçları alındı."
-        }
+REFUSAL_MESSAGES = {
+    "tr": "Üzgünüm{name}, ben sadece bir alışveriş asistanıyım. Ürün bulma veya fiyat karşılaştırma konusunda yardımcı olabilirim.",
+    "en": "Sorry{name}, I'm only a shopping assistant. I can help you find products or compare prices.",
+    "ar": "معذرة{name}، أنا مجرد مساعد تسوق. يمكنني مساعدتك في العثور على المنتجات أو مقارنة الأسعار.",
+    "ru": "Извините{name}, я всего лишь помощник по покупкам. Я могу помочь вам найти товары или сравнить цены.",
+    "fr": "Désolé{name}, je ne suis qu'un assistant shopping. Je peux vous aider à trouver des produits ou à comparer les prix.",
+    "de": "Entschuldigung{name}, ich bin nur ein Shopping-Assistent. Ich kann dir helfen, Produkte zu finden oder Preise zu vergleichen.",
+    "es": "Lo siento{name}, solo soy un asistente de compras. Puedo ayudarte a encontrar productos o comparar precios.",
+    "it": "Scusa{name}, sono solo un assistente agli acquisti. Posso aiutarti a trovare prodotti o confrontare i prezzi.",
+    "zh": "抱歉{name}，我只是一个购物助手。我可以帮您查找产品或比较价格。",
+    "ja": "申し訳ありません{name}、私はショッピングアシスタントです。商品の検索や価格の比較をお手伝いできます。",
+}
 
-        yield {"status": "thinking", "analysis": "Sonuçlar analiz ediliyor..."}
-        analysis_result = await analyst_node({**initial_state, **search_result})
-        yield {
-            "status": analysis_result.get("status", "completed"),
-            "analysis": analysis_result.get("analysis", ""),
-            "products": search_result.get("products", [])
-        }
-        return
+NO_RESULTS_MESSAGES = {
+    "tr": "Bu arama için uygun ürün bulamadım. İsteğini biraz farklı ifade etmeyi dener misin?",
+    "en": "I couldn't find matching products for this search. Could you try phrasing it differently?",
+}
 
-    if decision == "refusal":
-        yield {"status": "thinking", "analysis": "Uygun mu diye kontrol ediliyor..."}
-        refusal = await refusal_node(initial_state)
-        yield {"status": refusal.get("status", "out_of_scope"), "analysis": refusal.get("analysis", "")}
-        return
+ERROR_MESSAGES = {
+    "tr": "Şu an yanıt veremiyorum, lütfen birazdan tekrar dene.",
+    "en": "I can't respond right now, please try again shortly.",
+}
 
-    # fallback: call compiled agent
-    try:
-        result = await app_agent.ainvoke(initial_state)
-        yield {"status": result.get("status", "completed"), "analysis": result.get("analysis", ""), "products": result.get("products", [])}
-    except Exception:
-        raise
+
+def localized(messages: Dict[str, str], language: Optional[str]) -> str:
+    lang = (language or "tr").lower()
+    return messages.get(lang) or messages["en"]
+
 
 # --- NODES ---
 
-async def refusal_node(state: AgentState):
-    user = state.get("user_object")
-    lang = user.language if user else "tr"
-    name = user.full_name if user and user.full_name else ""
-    
-    refusal_messages = {
-        "tr": f"Üzgünüm {name}, ben sadece alışveriş asistanıyım. Ürün bulma veya fiyat karşılaştırma konusunda yardımcı olabilirim.",
-        "en": f"Sorry {name}, I am only a shopping assistant. I can help you with product search or price comparison.",
-        "ar": f"معذرة {name}، أنا مجرد مساعد تسوق. يمكنني مساعدتك في العثur على المنتجات أو مقارنة الأسعار.",
-        "ru": f"Извините, {name}, я всего лишь помощник по покупкам. Я могу помочь вам найти товары или сравнить цены.",
-        "fr": f"Désolé {name}, je ne suis qu'un assistant shopping. Je peux vous aider à trouver des produits ou à comparer les prix.",
-        "de": f"Entschuldigung {name}, ich bin nur bir Shopping-Assistent. Ich kann dir helfen, Produkte zu finden oder Preise zu vergleichen.",
-        "es": f"Lo siento {name}, solo soy un asistente de compras. Pueden ayudarte a encontrar productos o comparar precios.",
-        "it": f"Scusa {name}, sono solo un assistente agli acquisti. Posso aiutarti a trovare prodotti o confrontare i prezzi.",
-        "zh": f"抱歉 {name}，我只是一个购物助手。我可以帮您查找产品或比较价格。",
-        "ja": f"申し訳ありません {name}、私はショッピングアシスタントです。商品の検索や価格の比較をお手伝いできます。"
-    }
-    
-    response = refusal_messages.get(lang, refusal_messages["en"])
-    return {"analysis": response, "status": "out_of_scope"}
+async def router_node(state: AgentState) -> Dict[str, Any]:
+    related = await gemini_service.is_shopping_related(state["question"], state.get("history", []))
+    return {"route": "searcher" if related else "refusal"}
 
-async def searcher_node(state: AgentState):
-    user_msg = state["messages"][-1]
-    
-    try:
-        keywords = await get_keywords_from_gemini(user_msg) 
-        params = get_serp_params(keywords, state.get("user_object"))
-        params["api_key"] = settings.SERP_API_KEY
-        
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get("https://serpapi.com/search", params=params)
-            raw_results = response.json().get("shopping_results", [])[:3]
-        
-        clean_products = []
-        for item in raw_results:
-            clean_products.append({
-                "title": item.get("title"),
-                "price": item.get("extracted_price"),
-                "source": item.get("source"),
-                "link": item.get("product_link"),
-                "thumbnail": item.get("thumbnail")
-            })
-        
-        return {
-            "products": clean_products, 
-            "messages": [f"Aranan terim: {keywords}"],
-            "status": "searching"
-        }
-    except Exception as e:
-        print(f"Searcher Node Error: {str(e)}")
-        raise
 
-async def router_node(state: AgentState):
-    last_message = state["messages"][-1]
-    
-    message_text = last_message.content if hasattr(last_message, 'content') else last_message
-    
-    is_related = await is_shopping_related(message_text)
-    
-    if is_related:
-        return "searcher"
-    return "refusal"
-
-async def analyst_node(state: AgentState):
-    products_info = str(state["products"])
-    user = state.get("user_object")
-    
-    name = user.full_name if user and user.full_name else "Misafir"
-    currency = user.currency if user else "TRY"
-    
-    prompt = (
-        f"Kullanıcı Adı: {name}. Tercih Edilen Para Birimi: {currency}. "
-        f"Lütfen ürünleri analiz et ve kullanıcı misafir değilse ismiyle hitap ederek öneride bulun: {products_info}"
+async def searcher_node(state: AgentState) -> Dict[str, Any]:
+    query = await gemini_service.extract_search_query(state["question"], state.get("history", []))
+    products = await search_products(
+        query,
+        state.get("language"),
+        state.get("currency"),
+        limit=state.get("max_products", DEFAULT_MAX_PRODUCTS),
     )
-    
-    response = await analyze_product_performances(prompt)
-    return {"analysis": response, "status": "completed"}
+    return {"search_query": query, "products": products, "status": "searching"}
 
-# --- GRAPH SETUP ---
+
+async def analyst_node(state: AgentState) -> Dict[str, Any]:
+    products = state.get("products") or []
+    if not products:
+        # Don't spend an LLM call analysing nothing.
+        return {"analysis": localized(NO_RESULTS_MESSAGES, state.get("language")), "status": "completed"}
+
+    kwargs = {}
+    if state.get("analyst_model"):
+        kwargs["model_name"] = state["analyst_model"]
+    analysis = await gemini_service.analyze_products(
+        state["question"],
+        products,
+        user_name=state.get("user_name", ""),
+        currency=state.get("currency") or "TRY",
+        language=state.get("language") or "tr",
+        history=state.get("history", []),
+        **kwargs,
+    )
+    return {"analysis": analysis, "status": "completed"}
+
+
+async def refusal_node(state: AgentState) -> Dict[str, Any]:
+    name = state.get("user_name")
+    template = localized(REFUSAL_MESSAGES, state.get("language"))
+    return {"analysis": template.format(name=f" {name}" if name else ""), "status": "out_of_scope"}
+
+
+# --- GRAPH ---
 
 workflow = StateGraph(AgentState)
-
+workflow.add_node("router", router_node)
 workflow.add_node("searcher", searcher_node)
 workflow.add_node("analyst", analyst_node)
 workflow.add_node("refusal", refusal_node)
 
-workflow.set_conditional_entry_point(
-    router_node,
-    {
-        "searcher": "searcher",
-        "refusal": "refusal"
-    }
-)
-
+workflow.set_entry_point("router")
+workflow.add_conditional_edges("router", lambda s: s["route"], {"searcher": "searcher", "refusal": "refusal"})
 workflow.add_edge("searcher", "analyst")
 workflow.add_edge("analyst", END)
 workflow.add_edge("refusal", END)
 
 app_agent = workflow.compile()
+
+
+async def stream_agent(initial_state: AgentState) -> AsyncGenerator[Dict[str, Any], None]:
+    """Run the graph and yield client-facing events.
+
+    Event sequence: routing -> [searching -> thinking(products)] -> completed | out_of_scope.
+    Intermediate events carry no `analysis`; only the final event does.
+    """
+    yield {"status": "routing"}
+
+    products: List[dict] = []
+    async for update in app_agent.astream(initial_state, stream_mode="updates"):
+        for node, output in update.items():
+            output = output or {}
+            if node == "router" and output.get("route") == "searcher":
+                yield {"status": "searching"}
+            elif node == "searcher":
+                products = output.get("products", [])
+                yield {"status": "thinking", "products": products}
+            elif node == "analyst":
+                yield {"status": "completed", "analysis": output.get("analysis", ""), "products": products}
+            elif node == "refusal":
+                yield {"status": "out_of_scope", "analysis": output.get("analysis", "")}
