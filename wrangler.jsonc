@@ -1,0 +1,90 @@
+// SynapCart API on Cloudflare Workers.
+//   production: https://api.synapcart.emreaydin.dev          (`npm run deploy:prod`)
+//   staging:    https://staging-api.synapcart.emreaydin.dev  (`npm run deploy:staging`)
+// Secrets (set per environment, e.g. `wrangler secret put SECRET_KEY --env staging`):
+//   SECRET_KEY, GEMINI_API_KEY, SERP_API_KEY,
+//   GOOGLE_PLAY_SERVICE_ACCOUNT_JSON, PLAY_RTDN_TOKEN, FIREBASE_SERVICE_ACCOUNT_JSON,
+//   APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY   (optional App Store Server API key)
+// Bindings, routes and crons are NOT inherited by named environments, so each env repeats them.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "synapcart-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "workers_dev": false,
+  "routes": [{ "pattern": "api.synapcart.emreaydin.dev", "custom_domain": true }],
+  "triggers": { "crons": ["0 6 * * *"] }, // 06:00 UTC = 09:00 Türkiye
+
+  "vars": {
+    "ENV": "prod",
+    "CORS_ORIGINS": "https://synapcart.emreaydin.dev",
+    "APP_FRONTEND_URL": "https://synapcart.emreaydin.dev",
+    "EMAIL_FROM": "noreply@synapcart.emreaydin.dev",
+    "PREMIUM_ANALYST_MODEL": "gemini-2.5-flash",
+    "PLAY_PACKAGE_NAME": "com.neilb.synapcart",
+    "PLAY_SUBSCRIPTION_IDS": "synapcart_premium",
+    // OWNER: must match App Store Connect (bundle id, numeric Apple ID, subscription product ids).
+    "APPLE_BUNDLE_ID": "com.neilb.synapcart",
+    "APPLE_APP_ID": "",
+    "APPLE_PRODUCT_IDS": "synapcart_premium_monthly,synapcart_premium_yearly",
+    "APPLE_ENVIRONMENT": "Production"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "synapcart-prod",
+      // OWNER: `wrangler d1 create synapcart-prod`, then paste the id here.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Cloudflare Email Service: verify synapcart.emreaydin.dev for sending in the dashboard.
+  "send_email": [{ "name": "SEND_EMAIL", "allowed_sender_addresses": ["noreply@synapcart.emreaydin.dev"] }],
+  "ratelimits": [
+    { "name": "AUTH_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+    { "name": "EMAIL_LIMITER", "namespace_id": "1002", "simple": { "limit": 3, "period": 60 } },
+    { "name": "AGENT_LIMITER", "namespace_id": "1003", "simple": { "limit": 20, "period": 60 } },
+    { "name": "BILLING_LIMITER", "namespace_id": "1004", "simple": { "limit": 10, "period": 60 } }
+  ],
+
+  "env": {
+    "staging": {
+      "name": "synapcart-api-staging",
+      "routes": [{ "pattern": "staging-api.synapcart.emreaydin.dev", "custom_domain": true }],
+      "triggers": { "crons": ["0 6 * * *"] },
+      "vars": {
+        "ENV": "staging",
+        "CORS_ORIGINS": "https://staging.synapcart.emreaydin.dev,http://localhost:3000",
+        "APP_FRONTEND_URL": "https://staging.synapcart.emreaydin.dev",
+        "EMAIL_FROM": "noreply@synapcart.emreaydin.dev",
+        "PREMIUM_ANALYST_MODEL": "gemini-2.5-flash",
+        "PLAY_PACKAGE_NAME": "com.neilb.synapcart",
+        "PLAY_SUBSCRIPTION_IDS": "synapcart_premium",
+        "APPLE_BUNDLE_ID": "com.neilb.synapcart",
+        "APPLE_APP_ID": "",
+        "APPLE_PRODUCT_IDS": "synapcart_premium_monthly,synapcart_premium_yearly",
+        // Xcode StoreKit testing, TestFlight and sandbox testers all produce Sandbox transactions.
+        "APPLE_ENVIRONMENT": "Sandbox"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "synapcart-staging",
+          // OWNER: `wrangler d1 create synapcart-staging`, then paste the id here.
+          "database_id": "00000000-0000-0000-0000-000000000001",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "send_email": [{ "name": "SEND_EMAIL", "allowed_sender_addresses": ["noreply@synapcart.emreaydin.dev"] }],
+      "ratelimits": [
+        { "name": "AUTH_LIMITER", "namespace_id": "2001", "simple": { "limit": 10, "period": 60 } },
+        { "name": "EMAIL_LIMITER", "namespace_id": "2002", "simple": { "limit": 3, "period": 60 } },
+        { "name": "AGENT_LIMITER", "namespace_id": "2003", "simple": { "limit": 20, "period": 60 } },
+        { "name": "BILLING_LIMITER", "namespace_id": "2004", "simple": { "limit": 10, "period": 60 } }
+      ]
+    }
+  }
+}

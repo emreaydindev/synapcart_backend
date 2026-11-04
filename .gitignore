@@ -1,20 +1,10 @@
-# Environments
-venv/
-.env
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# IDE
+node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+dist/
+coverage/
 .vscode/
 .idea/
-
-# OS
 .DS_Store
-
-*.db
-# Tooling
-.pytest_cache/
-.venv/
