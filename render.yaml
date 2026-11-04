@@ -1,0 +1,76 @@
+# Render Blueprint. Secrets marked `sync: false` are entered in the dashboard.
+services:
+  - type: web
+    name: synapcart-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # Migrations run once before the server starts. A single uvicorn process
+    # keeps the in-memory rate limiter consistent; --proxy-headers makes the
+    # limiter see the real client IP behind Render's proxy.
+    startCommand: python -m app.db.migrate && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENV
+        value: prod
+      - key: AUTO_MIGRATE
+        value: "false"
+      - key: CORS_ORIGINS
+        value: https://synapcart-web.vercel.app
+      - key: APP_FRONTEND_URL
+        value: https://synapcart-web.vercel.app
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SERP_API_KEY
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: PREMIUM_ANALYST_MODEL
+        value: gemini-2.5-flash
+      - key: PLAY_PACKAGE_NAME
+        value: com.neilb.synapcart
+      # OWNER: comma-separated Play Console subscription product ids.
+      - key: PLAY_SUBSCRIPTION_IDS
+        value: synapcart_premium
+      - key: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: PLAY_RTDN_TOKEN
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+
+  # Daily price-alert check (premium favorites). Render cron jobs are a paid
+  # service; give it the same DATABASE_URL and keys as the web service.
+  - type: cron
+    name: synapcart-price-check
+    runtime: python
+    schedule: "0 6 * * *"   # 06:00 UTC = 09:00 Türkiye
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.jobs.price_check
+    envVars:
+      - key: ENV
+        value: prod
+      - key: AUTO_MIGRATE
+        value: "false"
+      - key: PLAY_SUBSCRIPTION_IDS
+        value: synapcart_premium
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SERP_API_KEY
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
