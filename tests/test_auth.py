@@ -129,3 +129,54 @@ def test_profile_update_validates(client):
     r = client.patch("/api/v1/user/me", json={"language": "EN", "currency": "usd"}, headers=headers)
     assert r.status_code == 200
     assert r.json()["language"] == "en" and r.json()["currency"] == "USD"
+
+
+def test_web_delete_request_flow(client, monkeypatch):
+    headers = register_and_login(client)
+    client.post("/api/v1/favorites/", json={"title": "X", "price": 10, "link": "https://shop.example/x", "source": "Shop"}, headers=headers)
+    sent = {}
+
+    async def fake_send(email, token):
+        sent["token"] = token
+
+    monkeypatch.setattr("app.api.v1.endpoints.auth.send_delete_email", fake_send)
+    known = client.post("/api/v1/auth/delete-request", json={"email": "USER@example.com"})
+    unknown = client.post("/api/v1/auth/delete-request", json={"email": "nobody@example.com"})
+    assert known.status_code == unknown.status_code == 200
+    assert known.json() == unknown.json()  # no account enumeration
+    raw = sent["token"]
+
+    with SessionLocal() as db:
+        assert db.query(User).first().delete_token == hash_reset_token(raw)
+
+    # A second request inside the cooldown doesn't send another email.
+    sent.clear()
+    client.post("/api/v1/auth/delete-request", json={"email": "user@example.com"})
+    assert "token" not in sent
+
+    assert client.post("/api/v1/auth/delete-confirm", json={"token": "wrong"}).status_code == 400
+    r = client.post("/api/v1/auth/delete-confirm", json={"token": raw})
+    assert r.status_code == 200
+    with SessionLocal() as db:
+        assert db.query(User).count() == 0
+    assert client.get("/api/v1/user/me", headers=headers).status_code == 401
+    assert client.post("/api/v1/auth/delete-confirm", json={"token": raw}).status_code == 400
+
+
+def test_web_delete_link_expires(client, monkeypatch):
+    register_and_login(client)
+    sent = {}
+
+    async def fake_send(email, token):
+        sent["token"] = token
+
+    monkeypatch.setattr("app.api.v1.endpoints.auth.send_delete_email", fake_send)
+    client.post("/api/v1/auth/delete-request", json={"email": "user@example.com"})
+    with SessionLocal() as db:
+        user = db.query(User).first()
+        user.delete_token_expires = utcnow() - timedelta(minutes=1)
+        db.commit()
+    r = client.post("/api/v1/auth/delete-confirm", json={"token": sent["token"]})
+    assert r.status_code == 400
+    with SessionLocal() as db:
+        assert db.query(User).count() == 1

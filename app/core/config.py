@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     SMTP_USER: str  # Gmail address
     SMTP_PASSWORD: str  # App password
     RESET_TOKEN_EXPIRE_HOURS: int = 1
+    DELETE_TOKEN_EXPIRE_HOURS: int = 24
 
     # Agent limits
     MAX_MESSAGE_LENGTH: int = 1000

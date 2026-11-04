@@ -27,3 +27,7 @@ class User(Base):
     # SHA-256 of the reset token (never the raw token).
     reset_token = Column(String, nullable=True, index=True)
     reset_token_expires = Column(DateTime, nullable=True)
+
+    # SHA-256 of the account-deletion token sent by POST /auth/delete-request.
+    delete_token = Column(String, nullable=True, index=True)
+    delete_token_expires = Column(DateTime, nullable=True)

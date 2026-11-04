@@ -48,3 +48,8 @@ def hash_reset_token(token: str) -> str:
 def build_reset_url(token: str) -> str:
     base_url = settings.APP_FRONTEND_URL.rstrip("/")
     return f"{base_url}/reset-password?token={quote(token, safe='')}"
+
+
+def build_delete_url(token: str) -> str:
+    base_url = settings.APP_FRONTEND_URL.rstrip("/")
+    return f"{base_url}/delete-account?token={quote(token, safe='')}"

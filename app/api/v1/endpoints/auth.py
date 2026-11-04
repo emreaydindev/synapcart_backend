@@ -18,6 +18,8 @@ from app.core.security import (
 )
 from app.models.user import User
 from app.schemas.user import (
+    AccountDeleteConfirm,
+    AccountDeleteRequest,
     PasswordReset,
     PasswordResetRequest,
     Token,
@@ -25,13 +27,14 @@ from app.schemas.user import (
     UserLogin,
     UserResponse,
 )
-from app.services.email_service import send_reset_email
+from app.services.email_service import send_delete_email, send_reset_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 FORGOT_PASSWORD_MESSAGE = "Bu email adresiyle ilişkili bir hesap varsa, şifre sıfırlama linki göndereceğiz."
-# Minimum gap between two reset emails for the same account.
+DELETE_REQUEST_MESSAGE = "Bu email adresiyle ilişkili bir hesap varsa, hesap silme onay linki göndereceğiz."
+# Minimum gap between two reset (or delete) emails for the same account.
 RESET_EMAIL_COOLDOWN = timedelta(minutes=2)
 
 
@@ -130,3 +133,51 @@ def reset_password(request: Request, body: PasswordReset, db: Session = Depends(
     db.commit()
 
     return {"message": "Şifreniz başarıyla sıfırlandı."}
+
+
+@router.post("/delete-request")
+@limiter.limit("3/hour")
+async def delete_request(request: Request, body: AccountDeleteRequest, db: Session = Depends(get_db)):
+    """Web account deletion (Play's deletion URL): email a single-use confirm link."""
+    user = get_user_by_email(db, body.email)
+    if not user:
+        return {"message": DELETE_REQUEST_MESSAGE}
+
+    now = utcnow()
+    expire_delta = timedelta(hours=settings.DELETE_TOKEN_EXPIRE_HOURS)
+    if user.delete_token_expires and (user.delete_token_expires - expire_delta) > now - RESET_EMAIL_COOLDOWN:
+        return {"message": DELETE_REQUEST_MESSAGE}
+
+    raw_token = generate_reset_token()
+    user.delete_token = hash_reset_token(raw_token)
+    user.delete_token_expires = now + expire_delta
+    db.commit()
+
+    try:
+        await send_delete_email(email=user.email, token=raw_token)
+    except Exception:
+        logger.exception("Failed to send account deletion email")
+        user.delete_token = None
+        user.delete_token_expires = None
+        db.commit()
+
+    return {"message": DELETE_REQUEST_MESSAGE}
+
+
+@router.post("/delete-confirm")
+@limiter.limit("10/hour")
+def delete_confirm(request: Request, body: AccountDeleteConfirm, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.delete_token == hash_reset_token(body.token)).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Geçersiz hesap silme linki.")
+
+    if user.delete_token_expires is None or utcnow() > user.delete_token_expires:
+        user.delete_token = None
+        user.delete_token_expires = None
+        db.commit()
+        raise HTTPException(status_code=400, detail="Hesap silme linkinin süresi dolmuş.")
+
+    db.delete(user)
+    db.commit()
+    logger.info("Account deleted via web confirmation")
+    return {"message": "Hesabınız ve tüm verileriniz silindi."}

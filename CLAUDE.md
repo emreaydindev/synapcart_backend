@@ -57,7 +57,8 @@ Because `settings` loads at import time, any import of `app.*` needs those env v
 - **Password reset:**
   - `/auth/forgot-password` stores the **SHA-256 hash** of the token and emails the raw token. It always returns the same message, even for unknown emails or SMTP failure, and has a 2-minute per-account cooldown.
   - The link is `{APP_FRONTEND_URL}/reset-password?token=...` (`build_reset_url`). The web portal and the app's deep links handle it, then POST `{token, new_password}` to `/auth/reset-password`.
-  - The email HTML lives in `services/email_service.py`.
+  - The email HTML lives in `services/email_service.py`, which uses the brand tokens shared with the app and web.
+- **Web account deletion** (Play's deletion URL): `POST /auth/delete-request {email}` mirrors forgot-password. It stores a hashed `User.delete_token`, has a `DELETE_TOKEN_EXPIRE_HOURS` expiry (default 24) and the same 2-minute cooldown, always returns the same message, and emails `{APP_FRONTEND_URL}/delete-account?token=...` (`build_delete_url`). `POST /auth/delete-confirm {token}` deletes the user and their data. Both emails share the `_html` template in `services/email_service.py`.
 - **User endpoints:** `POST /user/me/password` (returns a fresh token) and `DELETE /user/me` (optional `{password}` body, verified if present).
 - **Agent:** `app/services/agent_service.py`
   - **State:** `AgentState` holds plain values (`question`, `history`, `user_name`, `language`, `currency`, optional `max_products`/`analyst_model`), not ORM objects.

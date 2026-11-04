@@ -101,6 +101,14 @@ class PasswordResetRequest(UserBase):
     pass
 
 
+class AccountDeleteRequest(UserBase):
+    pass
+
+
+class AccountDeleteConfirm(BaseModel):
+    token: str = Field(min_length=1, max_length=256)
+
+
 class PasswordReset(BaseModel):
     token: str = Field(min_length=1, max_length=256)
     new_password: str
