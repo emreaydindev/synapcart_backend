@@ -28,6 +28,8 @@ class SessionResponse(BaseModel):
     user_id: str
     title: Optional[str] = None
     created_at: Optional[datetime] = None
+    # Free plan: sessions beyond the most recent 10 are kept but locked.
+    locked: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -70,3 +72,28 @@ class AgentResponse(BaseModel):
     status: str
     analysis: str
     products: List[Product] = []
+
+
+class CompareProduct(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+    price: Optional[float] = None
+    source: Optional[str] = Field(default=None, max_length=200)
+    link: Optional[str] = Field(default=None, max_length=2048)
+    thumbnail: Optional[str] = Field(default=None, max_length=2048)
+
+
+class CompareRequest(BaseModel):
+    products: List[CompareProduct] = Field(min_length=2, max_length=4)
+
+
+class CompareItem(BaseModel):
+    title: str
+    link: Optional[str] = None
+    pros: List[str] = []
+    cons: List[str] = []
+
+
+class CompareResponse(BaseModel):
+    items: List[CompareItem]
+    verdict: str
+    best_index: Optional[int] = None

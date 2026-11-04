@@ -6,15 +6,30 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user_required
 from app.core.database import get_db
 from app.core.security import create_access_token, get_password_hash, verify_password
+from app.models.usage import DeviceToken
 from app.models.user import User
-from app.schemas.user import AccountDelete, PasswordChange, Token, UserResponse, UserUpdate
+from app.core.database import utcnow
+from app.schemas.user import AccountDelete, DeviceTokenIn, PasswordChange, Token, UserResponse, UserUpdate
+from app.services import plan_service
 
 router = APIRouter()
 
 
+def profile_response(db: Session, user: User) -> UserResponse:
+    limits = plan_service.get_limits(user)
+    return UserResponse.model_validate(user).model_copy(
+        update={
+            "plan": limits.plan,
+            "plan_expires_at": user.plan_expires_at if limits.plan == plan_service.PLAN_PREMIUM else None,
+            "usage_today": plan_service.usage_today(db, user),
+            "daily_limit": limits.daily_messages,
+        }
+    )
+
+
 @router.get("/me", response_model=UserResponse)
-def get_my_profile(current_user: User = Depends(get_current_user_required)):
-    return current_user
+def get_my_profile(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
+    return profile_response(db, current_user)
 
 
 @router.patch("/me", response_model=UserResponse)
@@ -29,7 +44,39 @@ def update_profile(
 
     db.commit()
     db.refresh(current_user)
-    return current_user
+    return profile_response(db, current_user)
+
+
+@router.post("/me/device-token", status_code=status.HTTP_204_NO_CONTENT)
+def register_device_token(
+    body: DeviceTokenIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_required),
+):
+    """Register (or move to this user) an FCM token. Idempotent."""
+    row = db.query(DeviceToken).filter(DeviceToken.token == body.token).first()
+    if row:
+        row.user_id = current_user.id
+        row.platform = body.platform
+        row.updated_at = utcnow()
+    else:
+        db.add(DeviceToken(user_id=current_user.id, token=body.token, platform=body.platform))
+    db.commit()
+    return None
+
+
+@router.delete("/me/device-token", status_code=status.HTTP_204_NO_CONTENT)
+def unregister_device_token(
+    body: DeviceTokenIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_required),
+):
+    """Called on logout so the device stops receiving this user's alerts."""
+    db.query(DeviceToken).filter(
+        DeviceToken.token == body.token, DeviceToken.user_id == current_user.id
+    ).delete()
+    db.commit()
+    return None
 
 
 @router.post("/me/password", response_model=Token)

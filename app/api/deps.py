@@ -7,8 +7,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.errors import premium_required, quota_exceeded
 from app.core.security import ALGORITHM, SECRET_KEY
 from app.models.user import User
+from app.services import plan_service
+from app.services.plan_service import PlanLimits
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/token", auto_error=False)
 
@@ -53,4 +56,24 @@ def get_current_user_required(
             detail="Oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    return current_user
+
+
+def require_quota(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_required),
+) -> PlanLimits:
+    """Agent routes: 402 `quota_exceeded` once today's messages are used up.
+
+    Only checks; the endpoint records the message once the request is valid.
+    """
+    limits = plan_service.get_limits(current_user)
+    if plan_service.usage_today(db, current_user) >= limits.daily_messages:
+        raise quota_exceeded(limits.daily_messages)
+    return limits
+
+
+def require_premium(current_user: User = Depends(get_current_user_required)) -> User:
+    if not plan_service.is_premium(current_user):
+        raise premium_required()
     return current_user

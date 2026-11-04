@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.v1.api import api_router
 from app.core.config import settings
+from app.core.errors import CodedError
 from app.core.logging import setup_logging
 from app.core.rate_limit import limiter
 
@@ -54,6 +55,11 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         content={"detail": "Çok fazla istek gönderdiniz. Lütfen biraz bekleyip tekrar deneyin.", "code": "rate_limited"},
     )
+
+
+@app.exception_handler(CodedError)
+async def coded_error_handler(request: Request, exc: CodedError):
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail, "code": exc.code})
 
 
 @app.exception_handler(RequestValidationError)

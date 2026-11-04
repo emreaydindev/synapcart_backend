@@ -17,5 +17,12 @@ class Favorite(Base):
     thumbnail = Column(String)
     created_at = Column(DateTime, nullable=True, default=utcnow)
 
+    # Price alerts (premium): notify when the price drops to `target_price`.
+    target_price = Column(Float, nullable=True)
+    last_checked_price = Column(Float, nullable=True)
+    last_checked_at = Column(DateTime, nullable=True)
+    # Price of the last alert sent, so a stable price doesn't notify every day.
+    last_notified_price = Column(Float, nullable=True)
+
     user_id = Column(String, ForeignKey("users.id"), index=True)
     owner = relationship("User", back_populates="favorites")

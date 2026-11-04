@@ -21,6 +21,18 @@ def get_owned_session(db: Session, session_id: int, user: User) -> Optional[Chat
     ).first()
 
 
+def is_session_locked(db: Session, session: ChatSession, max_sessions: Optional[int]) -> bool:
+    """A session is locked when the user has `max_sessions` newer ones."""
+    if max_sessions is None:
+        return False
+    newer = (
+        db.query(ChatSession)
+        .filter(ChatSession.user_id == session.user_id, ChatSession.id > session.id)
+        .count()
+    )
+    return newer >= max_sessions
+
+
 def load_history(db: Session, session_id: int, limit: int = HISTORY_MESSAGES) -> List[str]:
     """Most recent messages, oldest first, as 'Kullanıcı: ...' / 'Asistan: ...' lines."""
     rows = (

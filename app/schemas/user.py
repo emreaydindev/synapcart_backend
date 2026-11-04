@@ -87,8 +87,18 @@ class UserResponse(UserBase):
     language: str
     currency: str
     created_at: Optional[datetime] = None
+    # Effective plan ("free" | "premium"); premium may carry an expiry.
+    plan: str = "free"
+    plan_expires_at: Optional[datetime] = None
+    usage_today: Optional[int] = None
+    daily_limit: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DeviceTokenIn(BaseModel):
+    token: str = Field(min_length=1, max_length=4096)
+    platform: Optional[str] = Field(default="android", max_length=20)
 
 
 class Token(BaseModel):

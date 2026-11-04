@@ -19,7 +19,7 @@ alembic check                                                # verify models and
 
 - Port **8001** is the convention: the mobile app and web portal expect the backend there when run locally.
 - Dependencies are pinned in `requirements.txt`; `requirements-dev.txt` adds pytest.
-- Tests (`tests/`) run against a temp SQLite DB with `ENV=test` (rate limiting off). `tests/conftest.py`'s `fake_ai` fixture monkeypatches `gemini_service` functions and `agent_service.search_products`, so no API keys or network are needed. `tests/fixtures/*.json` are saved sample agent responses.
+- Tests (`tests/`) run against a temp SQLite DB with `ENV=test` (rate limiting off). `tests/conftest.py`'s `fake_ai` fixture monkeypatches `gemini_service` functions and `agent_service.search_products`, so no API keys or network are needed. `tests/test_premium.py` covers quota, tiers, history lock, compare, price alerts and billing (Play API mocked); `tests/test_google.py` covers the service-account token flow and FCM with `httpx.MockTransport`. `tests/fixtures/*.json` are saved sample agent responses.
 - No linter/formatter is configured.
 
 ## Configuration
@@ -29,6 +29,7 @@ alembic check                                                # verify models and
 - `AUTO_MIGRATE`: run migrations on startup. It defaults to true; `render.yaml` sets it to false and migrates in the start command instead.
 - `CORS_ORIGINS`: a comma-separated list.
 - Also `ACCESS_TOKEN_EXPIRE_MINUTES` (default 1 week), `RESET_TOKEN_EXPIRE_HOURS`, `AGENT_RATE_LIMIT` and `MAX_MESSAGE_LENGTH`.
+- Premium: `PREMIUM_ANALYST_MODEL`, `PLAY_PACKAGE_NAME`, `PLAY_SUBSCRIPTION_IDS` (comma-separated), `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, `PLAY_RTDN_TOKEN`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `FIREBASE_PROJECT_ID`. The `*_JSON` keys take the key file's JSON content or a path. When they are empty, `/billing/google/verify` returns 503, RTDN returns 403 and the price job checks prices without sending pushes.
 
 Because `settings` loads at import time, any import of `app.*` needs those env vars.
 
@@ -36,7 +37,7 @@ Because `settings` loads at import time, any import of `app.*` needs those env v
 
 ## Architecture
 
-- **Entry:** `app/main.py` creates the app and mounts `api/v1/api.py` under `/api/v1`. Routers are `/chat`, `/auth`, `/favorites`, `/user` (profiles), plus `/api/v1/health` (pings the DB). It also:
+- **Entry:** `app/main.py` creates the app and mounts `api/v1/api.py` under `/api/v1`. Routers are `/chat`, `/auth`, `/favorites`, `/user` (profiles), `/billing`, plus `/api/v1/health` (pings the DB). It also:
   - restricts CORS to `CORS_ORIGINS`;
   - registers the slowapi limiter;
   - adds exception handlers that keep every error body as `{"detail": "<string>"}`. Validation errors become a single readable message; a pydantic `ValueError("...")` message becomes the `detail`. Clients rely on `detail` being a string.
@@ -73,7 +74,18 @@ Because `settings` loads at import time, any import of `app.*` needs those env v
     - The Android app parses these (`AgentStreamEvent`), so keep the field names stable.
   - **History:** history is loaded *before* saving the new user message: the last 6 messages, flattened into `"Kullanıcı: …"`/`"Asistan: …"` strings. Assistant messages store `products` as JSON on `ChatMessage.products`, and `/messages` returns them parsed. The session title is set from the first user message, replacing "Yeni Sohbet".
   - **Persistence during streaming:** the stream saves the final answer with its own `SessionLocal()`, because the request DB session may already be closed.
-- **Gemini:** `app/services/gemini_service.py` uses the `google-genai` SDK (`client.aio.models.generate_content`) with default model `gemini-2.5-flash-lite`. `generate()` adds a timeout and raises `GeminiError` on failure, blocked or empty output. Prompts are in Turkish and wrap user text in `<kullanici_mesaji>` delimiters.
+- **Plans and quota** (`services/plan_service.py`): `get_limits(user)` returns a `PlanLimits` (daily messages, products per search, analyst model, session history, compare and price-alert flags). Free: 5 messages/day, 3 products, `gemini-2.5-flash-lite`, last 10 sessions. Premium: 100/day soft cap, 8 products, `PREMIUM_ANALYST_MODEL`, unlimited history. `effective_plan` treats premium as free once `plan_expires_at` has passed. These numbers are mirrored in `synapcart_web/lib/site.ts` (`plans`) and the mobile paywall strings; change them together.
+  - `usage_daily(user_id, date, messages)` counts agent messages per UTC day. `deps.require_quota` (on both agent routes) only checks; `_start_agent_turn` records the message after the ownership and history-lock checks, so a 404 or locked session costs nothing.
+  - Plan errors use `core/errors.CodedError`, whose body is `{"detail", "code"}`; all are HTTP 402 with `code` `quota_exceeded`, `premium_required` (`deps.require_premium`) or `history_locked`. The app opens the paywall on these.
+  - `/chat/sessions` returns every session newest-first with a `locked` flag; on the free plan everything past the 10 newest is locked, and its `/messages` and agent routes return 402 `history_locked`. Locked sessions can still be renamed or deleted.
+  - `GET`/`PATCH /user/me` include `plan` (effective), `plan_expires_at`, `usage_today` and `daily_limit` (`profiles.profile_response`).
+- **Billing** (`endpoints/billing.py`, `services/billing_service.py`):
+  - `POST /billing/google/verify {purchase_token, product_id}` calls Play's `purchases.subscriptionsv2.get`, rejects a purchase whose `obfuscatedExternalAccountId` (the app sends the user id) or stored token belongs to another user (409), then sets `plan`, `plan_expires_at`, `play_purchase_token` and `play_product_id`, and returns the profile. ACTIVE, IN_GRACE_PERIOD and CANCELED-before-expiry are entitled. The app acknowledges the purchase itself.
+  - `POST /billing/google/rtdn?token=PLAY_RTDN_TOKEN` is the Pub/Sub push endpoint. Every subscription notification re-fetches the subscription and re-applies it (matched by stored token, `linkedPurchaseToken`, or the obfuscated account id); voided purchases revoke. A 5xx makes Pub/Sub retry.
+  - `services/google_auth.py` mints service-account access tokens with the JWT-bearer flow (python-jose + httpx), so there is no google-auth or firebase-admin dependency.
+- **Price alerts:** `Favorite.target_price` is set with `PATCH /favorites/{id}` (premium; `null` clears it and re-arms the alert). `POST`/`DELETE /user/me/device-token {token}` manage FCM tokens (`device_tokens`, a token moves to whoever registered it last). `app/jobs/price_check.py` (`python -m app.jobs.price_check`, a daily Render cron job in `render.yaml`) re-searches each premium favorite by title, matches the same offer by link or store+title, stores `last_checked_price`, and pushes through `services/push_service.py` (FCM HTTP v1, Android channel `price_alerts`, data `{type: price_alert, favorite_id, link, price}`) when the price is at or below the target and below the last alerted price. Unregistered tokens are deleted.
+- **Comparison:** `POST /chat/compare {products: [2–4]}` (premium, agent rate limit) makes one JSON-mode Gemini call (`gemini_service.compare_products`) and returns `{items: [{title, link, pros, cons}], verdict, best_index}` with exactly one item per product, in order, in the user's language. Gemini failures are 502.
+- **Gemini:** `app/services/gemini_service.py` uses the `google-genai` SDK (`client.aio.models.generate_content`) with default model `gemini-2.5-flash-lite` (premium analysis uses `PREMIUM_ANALYST_MODEL`). `generate()` has a `json_mode` flag, adds a timeout and raises `GeminiError` on failure, blocked or empty output. Prompts are in Turkish and wrap user text in `<kullanici_mesaji>` delimiters.
 - **Chat endpoints** check ownership via `chat_service.get_owned_session` (404 if not the caller's). Sessions can be listed newest-first, created, renamed (`PATCH`) and deleted.
 - **Favorites:** `(user_id, link)` is unique. `POST /favorites/` is idempotent (200 with the existing row). It accepts `price` as a number or a string. There is also `DELETE /favorites/by-link?link=`. Responses include `currency` and `added_at`.
 

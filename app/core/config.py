@@ -39,9 +39,26 @@ class Settings(BaseSettings):
     AGENT_RATE_LIMIT: str = "20/minute"
     GEMINI_TIMEOUT_SECONDS: float = 30.0
 
+    # Premium analyst model (free users get gemini_service.DEFAULT_MODEL).
+    PREMIUM_ANALYST_MODEL: str = "gemini-2.5-flash"
+
+    # Google Play Billing. The service account needs "View financial data" in
+    # Play Console. GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is the key file's JSON
+    # content (or a path to it). Unset = /billing/google/verify returns 503.
+    PLAY_PACKAGE_NAME: str = "com.neilb.synapcart"
+    PLAY_SUBSCRIPTION_IDS: Annotated[List[str], NoDecode] = ["synapcart_premium"]
+    GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: str = ""
+    # Shared secret for the Pub/Sub push endpoint (?token=...). Unset = RTDN disabled.
+    PLAY_RTDN_TOKEN: str = ""
+
+    # Firebase Cloud Messaging (price alerts). Service account JSON content or
+    # path; FIREBASE_PROJECT_ID defaults to the key's project_id.
+    FIREBASE_SERVICE_ACCOUNT_JSON: str = ""
+    FIREBASE_PROJECT_ID: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    @field_validator("CORS_ORIGINS", mode="before")
+    @field_validator("CORS_ORIGINS", "PLAY_SUBSCRIPTION_IDS", mode="before")
     @classmethod
     def _split_origins(cls, v):
         if isinstance(v, str):

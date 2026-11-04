@@ -43,9 +43,17 @@ class FavoriteCreate(FavoriteBase):
     pass
 
 
+class FavoriteUpdate(BaseModel):
+    # null clears the price alert.
+    target_price: Optional[float] = Field(default=None, gt=0, lt=1e9)
+
+
 class FavoriteResponse(FavoriteBase):
     id: int
     user_id: str
+    target_price: Optional[float] = None
+    last_checked_price: Optional[float] = None
+    last_checked_at: Optional[datetime] = None
     added_at: Optional[datetime] = Field(default=None, validation_alias="created_at")
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
