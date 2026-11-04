@@ -1,66 +1,86 @@
 # SynapCart Backend API
 
-SynapCart projesinin çekirdek API hizmetidir. FastAPI tabanlı bu servis, kullanıcı oturum yönetimi, AI destekli alışveriş asistanı (LangGraph + Gemini) ve e-posta tabanlı şifre sıfırlama işlevlerini yönetir.
+SynapCart'ın çekirdek API'si. **Cloudflare Workers** üzerinde çalışan bir TypeScript (Hono) servisidir. Veritabanı olarak **Cloudflare D1** kullanır. Şunları yönetir:
 
-## Teknik Yığın
+- kullanıcı hesapları;
+- AI alışveriş asistanı (Gemini ve SerpAPI Google Shopping);
+- favoriler ve fiyat alarmları;
+- Free/Premium planlar;
+- Google Play ve App Store abonelik doğrulaması;
+- e-posta ile şifre sıfırlama ve hesap silme (Cloudflare Email Service).
 
-- **Framework:** FastAPI
-- **Veritabanı:** SQLAlchemy + Alembic (PostgreSQL / SQLite)
-- **AI Entegrasyonu:** LangGraph, Google Gemini (`google-genai`)
-- **Arama Servisi:** SerpAPI (Google Shopping)
+| Ortam | Adres |
+|---|---|
+| Production | `https://api.synapcart.emreaydin.dev` |
+| Staging | `https://staging-api.synapcart.emreaydin.dev` |
+| Yerel | `http://localhost:8001` |
 
-## Kurulum ve Başlatma
+## Teknik yığın
 
-### 1. Ortam Kurulumu
+- **Runtime:** Cloudflare Workers (`nodejs_compat`), Hono
+- **Veritabanı:** Cloudflare D1 (SQLite). Migrasyonlar `migrations/` altında, `wrangler d1 migrations` ile uygulanır.
+- **AI:** Gemini REST API (`gemini-2.5-flash-lite`; Premium analizde `PREMIUM_ANALYST_MODEL`)
+- **Arama:** SerpAPI `google_shopping` (30 dakika Workers Cache API önbelleği)
+- **E-posta:** Cloudflare Email Service (`send_email` binding)
+- **Push:** FCM HTTP v1 (Android ve iOS)
+- **Ödemeler:**
+  - Google Play Developer API ve RTDN;
+  - App Store: StoreKit 2 JWS doğrulaması ve App Store Server Notifications V2.
+- **Testler:** Vitest ve `@cloudflare/vitest-plugin`, gerçek workerd ve yerel D1 ile.
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt
-```
-
-### 2. Yapılandırma
-
-`.env.example` dosyasını `.env` olarak kopyalayın ve değerleri doldurun:
-
-```bash
-cp .env.example .env
-```
-
-Zorunlu anahtarlar: `SECRET_KEY`, `DATABASE_URL`, `GEMINI_API_KEY`, `SERP_API_KEY`, `SMTP_USER`, `SMTP_PASSWORD`.
-`ENV=prod` olduğunda `SECRET_KEY` en az 32 karakter olmalıdır ve `/docs` kapatılır.
-
-### 3. Veritabanı
-
-Şema Alembic ile yönetilir. Geliştirme ortamında (`AUTO_MIGRATE=true`, varsayılan) migrasyonlar uygulama açılışında otomatik çalışır. Elle çalıştırmak için:
+## Yerel geliştirme
 
 ```bash
-python -m app.db.migrate
+npm install
+cp .dev.vars.example .dev.vars      # SECRET_KEY, GEMINI_API_KEY, SERP_API_KEY
+npm run db:migrate:local
+npm run dev -- --port 8001          # http://localhost:8001/api/v1/health
+npm test                            # 60 test; dış servisler taklit edilir
+npm run typecheck
 ```
 
-Eski `create_all` ile oluşturulmuş veritabanları otomatik olarak baseline'a işaretlenir ve sadece yeni migrasyonlar uygulanır.
+Yerelde e-postalar gönderilmez. Wrangler içeriklerini `.wrangler/tmp/email/` altına yazar.
 
-Yeni bir model değişikliği için:
+## İlk kurulum (Cloudflare)
 
-```bash
-alembic revision --autogenerate -m "aciklama"
-```
+1. `synapcart.emreaydin.dev` alan adı Cloudflare'de olmalıdır. Workers Paid planı gerekir; şifre hashleme ve agent çağrıları için CPU süresi lazım.
+2. D1 veritabanlarını oluşturun ve çıkan `database_id` değerlerini `wrangler.jsonc` dosyasına yazın:
 
-### 4. Sunucuyu Çalıştırma
+   ```bash
+   npx wrangler d1 create synapcart-prod
+   npx wrangler d1 create synapcart-staging
+   ```
 
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
-```
+3. Email Service: Cloudflare panelinde **Email → Email Sending** bölümünde `synapcart.emreaydin.dev` alan adını gönderici olarak doğrulayın.
+4. Gizli anahtarları her ortam için ayrı girin:
 
-API dokümantasyonu: http://localhost:8001/docs
+   ```bash
+   npx wrangler secret put SECRET_KEY --env staging     # openssl rand -base64 48
+   npx wrangler secret put GEMINI_API_KEY --env staging
+   npx wrangler secret put SERP_API_KEY --env staging
+   # İsteğe bağlı: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON, PLAY_RTDN_TOKEN,
+   # FIREBASE_SERVICE_ACCOUNT_JSON, APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY
+   ```
 
-### 5. Testler
+   Production için aynı komutları `--env=""` ile çalıştırın.
+5. Migrasyonları uygulayın ve deploy edin:
 
-```bash
-pytest
-```
+   ```bash
+   npm run db:migrate:staging && npm run deploy:staging
+   npm run db:migrate:prod && npm run deploy:prod
+   ```
 
-Testler SQLite kullanır; Gemini ve SerpAPI çağrıları taklit edilir (gerçek API anahtarı gerekmez).
+   Custom domain'ler (`api.` ve `staging-api.`) deploy sırasında otomatik oluşturulur.
 
-## Deploy (Render)
+GitHub Actions (`.github/workflows/ci.yml`):
+- her push ve PR'da typecheck ve testleri çalıştırır;
+- `main` dalını staging'e deploy eder;
+- `v*` etiketlerini production'a deploy eder.
 
-`render.yaml` bir Render Blueprint'idir: migrasyonları çalıştırır, ardından `uvicorn`'u proxy başlıklarına güvenerek başlatır (rate limit gerçek istemci IP'sini görsün diye). Gizli anahtarlar Render panelinden girilir.
+Gereken repo secret'ları: `CLOUDFLARE_API_TOKEN` ve `CLOUDFLARE_ACCOUNT_ID`.
+
+## Mağaza entegrasyonları
+
+- **Google Play RTDN:** Pub/Sub push URL'si `https://api.synapcart.emreaydin.dev/api/v1/billing/google/rtdn?token=<PLAY_RTDN_TOKEN>`.
+- **App Store Server Notifications V2:** App Store Connect → App Information bölümünde production URL'si `https://api.synapcart.emreaydin.dev/api/v1/billing/apple/notifications`, sandbox URL'si `https://staging-api.synapcart.emreaydin.dev/api/v1/billing/apple/notifications`.
+- `APPLE_BUNDLE_ID`, `APPLE_PRODUCT_IDS` ve `APPLE_APP_ID` (`wrangler.jsonc` içinde) App Store Connect ile aynı olmalıdır.
