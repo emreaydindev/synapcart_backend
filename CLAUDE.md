@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-SynapCart backend: a FastAPI service for an AI shopping assistant. It handles auth, chat sessions with a LangGraph agent (Gemini plus Google Shopping search), favorites, user profiles and password-reset email. It is consumed by the Android app (`synapcart_mobile`) and the Next.js reset-password page (`synapcart_web`). The three repos are grouped as git submodules in the `synapcart` umbrella repo.
+SynapCart backend: a FastAPI service for an AI shopping assistant. It handles auth, chat sessions with a LangGraph agent (Gemini plus Google Shopping search), favorites, user profiles, the free/Premium plan and daily quota, Google Play subscription billing, FCM price alerts, AI product comparison, and password-reset and account-deletion email. It is consumed by the Android app (`synapcart_mobile`) and the Next.js web portal (`synapcart_web`: password reset and account deletion). The three repos are grouped as git submodules in the `synapcart` umbrella repo.
 
 ## Commands
 
