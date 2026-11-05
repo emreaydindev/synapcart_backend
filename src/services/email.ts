@@ -81,9 +81,10 @@ export const outbox: { capture?: (m: OutgoingEmail) => void | Promise<void> } = 
 
 async function send(env: Env, message: OutgoingEmail): Promise<void> {
   if (outbox.capture) return outbox.capture(message);
+  if (env.RESEND_API_KEY) return sendWithResend(env, env.RESEND_API_KEY, message);
   if (!env.SEND_EMAIL) {
-    if (settings(env).isProd) throw new EmailError("SEND_EMAIL binding is not configured");
-    console.log(`[email] SEND_EMAIL not bound; would send "${message.subject}"`);
+    if (settings(env).isProd) throw new EmailError("No email provider configured (RESEND_API_KEY or SEND_EMAIL)");
+    console.log(`[email] no email provider; would send "${message.subject}"`);
     return;
   }
   try {
@@ -97,6 +98,28 @@ async function send(env: Env, message: OutgoingEmail): Promise<void> {
   } catch (e) {
     throw new EmailError(`Email send failed: ${(e as Error).message}`);
   }
+}
+
+/** Resend HTTP API (free tier: 3,000 emails/month, 100/day). The EMAIL_FROM domain must be verified there. */
+async function sendWithResend(env: Env, apiKey: string, message: OutgoingEmail): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: `SynapCart <${settings(env).emailFrom}>`,
+        to: [message.to],
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (e) {
+    throw new EmailError(`Email send failed: ${(e as Error).message}`);
+  }
+  if (!res.ok) throw new EmailError(`Email send failed: Resend returned ${res.status}`);
 }
 
 export async function sendResetEmail(env: Env, email: string, token: string) {

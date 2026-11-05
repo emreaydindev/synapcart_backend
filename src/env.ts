@@ -1,7 +1,7 @@
 /** Worker bindings, vars and secrets (see wrangler.jsonc and .dev.vars.example). */
 export interface Env {
   DB: D1Database;
-  /** Cloudflare Email Service binding. Unset = emails are logged, not sent (dev/test). */
+  /** Cloudflare Email Service binding (Workers Paid only). Used when RESEND_API_KEY is unset. */
   SEND_EMAIL?: SendEmail;
   /** Workers Rate Limiting bindings. Unset = no rate limiting (dev/test). */
   AUTH_LIMITER?: RateLimit;
@@ -14,6 +14,7 @@ export interface Env {
   CORS_ORIGINS?: string; // comma-separated
   APP_FRONTEND_URL?: string;
   EMAIL_FROM?: string;
+  PASSWORD_ITERATIONS?: string; // PBKDF2 count, 10000-100000 (default 100000)
   ACCESS_TOKEN_EXPIRE_MINUTES?: string;
   PREMIUM_ANALYST_MODEL?: string;
   PLAY_PACKAGE_NAME?: string;
@@ -28,6 +29,8 @@ export interface Env {
   SECRET_KEY: string;
   GEMINI_API_KEY: string;
   SERP_API_KEY: string;
+  /** Resend (resend.com) API key. Preferred over SEND_EMAIL; neither set = emails are logged (dev/test). */
+  RESEND_API_KEY?: string;
   GOOGLE_PLAY_SERVICE_ACCOUNT_JSON?: string;
   PLAY_RTDN_TOKEN?: string;
   FIREBASE_SERVICE_ACCOUNT_JSON?: string;

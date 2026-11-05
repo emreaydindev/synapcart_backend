@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../context";
 import { requireUser } from "../context";
 import { deleteUser, updateUser, type UserRow } from "../db";
+import { settings } from "../config";
 import { ApiError } from "../lib/errors";
 import { hashPassword, verifyPassword } from "../lib/password";
 import { nowIso } from "../lib/time";
@@ -51,7 +52,7 @@ user.post("/me/password", async (c) => {
     throw new ApiError(403, "Mevcut şifre hatalı.");
   }
   const fresh = await updateUser(c.env.DB, me.id, {
-    hashed_password: await hashPassword(body.new_password),
+    hashed_password: await hashPassword(body.new_password, settings(c.env).passwordIterations),
     token_version: (me.token_version ?? 0) + 1,
   });
   // Other devices are logged out; this one gets a fresh token.

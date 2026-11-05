@@ -7,7 +7,7 @@ SynapCart'ın çekirdek API'si. **Cloudflare Workers** üzerinde çalışan bir 
 - favoriler ve fiyat alarmları;
 - Free/Premium planlar;
 - Google Play ve App Store abonelik doğrulaması;
-- e-posta ile şifre sıfırlama ve hesap silme (Cloudflare Email Service).
+- e-posta ile şifre sıfırlama ve hesap silme (Resend).
 
 | Ortam | Adres |
 |---|---|
@@ -21,7 +21,7 @@ SynapCart'ın çekirdek API'si. **Cloudflare Workers** üzerinde çalışan bir 
 - **Veritabanı:** Cloudflare D1 (SQLite). Migrasyonlar `migrations/` altında, `wrangler d1 migrations` ile uygulanır.
 - **AI:** Gemini REST API (`gemini-2.5-flash-lite`; Premium analizde `PREMIUM_ANALYST_MODEL`)
 - **Arama:** SerpAPI `google_shopping` (30 dakika Workers Cache API önbelleği)
-- **E-posta:** Cloudflare Email Service (`send_email` binding)
+- **E-posta:** Resend HTTP API (ücretsiz katman: ayda 3.000, günde 100 e-posta). Workers Paid planında isteğe bağlı olarak Cloudflare Email Service (`send_email` binding).
 - **Push:** FCM HTTP v1 (Android ve iOS)
 - **Ödemeler:**
   - Google Play Developer API ve RTDN;
@@ -39,11 +39,11 @@ npm test                            # 60 test; dış servisler taklit edilir
 npm run typecheck
 ```
 
-Yerelde e-postalar gönderilmez. Wrangler içeriklerini `.wrangler/tmp/email/` altına yazar.
+Yerelde `RESEND_API_KEY` boşsa e-postalar gönderilmez, yalnızca konsola yazılır.
 
 ## İlk kurulum (Cloudflare)
 
-1. `synapcart.emreaydin.dev` alan adı Cloudflare'de olmalıdır. Workers Paid planı gerekir; şifre hashleme ve agent çağrıları için CPU süresi lazım.
+1. `synapcart.emreaydin.dev` alan adı Cloudflare'de olmalıdır. Workers **Free** planı yeterlidir (günde 100.000 istek, istek başına 10 ms CPU). 10 ms sınırı için `PASSWORD_ITERATIONS` 25000'dir; Paid plana geçerseniz 100000 yapın, mevcut hash'ler kullanıcının bir sonraki girişinde yükseltilir.
 2. D1 veritabanlarını oluşturun ve çıkan `database_id` değerlerini `wrangler.jsonc` dosyasına yazın:
 
    ```bash
@@ -51,13 +51,14 @@ Yerelde e-postalar gönderilmez. Wrangler içeriklerini `.wrangler/tmp/email/` a
    npx wrangler d1 create synapcart-staging
    ```
 
-3. Email Service: Cloudflare panelinde **Email → Email Sending** bölümünde `synapcart.emreaydin.dev` alan adını gönderici olarak doğrulayın.
+3. E-posta: resend.com'da ücretsiz hesap açın, **Domains → Add Domain** ile `synapcart.emreaydin.dev` alan adını ekleyip verdiği DNS kayıtlarını Cloudflare DNS'e girin. **API Keys** bölümünden bir anahtar oluşturup `RESEND_API_KEY` olarak kaydedin.
 4. Gizli anahtarları her ortam için ayrı girin:
 
    ```bash
    npx wrangler secret put SECRET_KEY --env staging     # openssl rand -base64 48
    npx wrangler secret put GEMINI_API_KEY --env staging
    npx wrangler secret put SERP_API_KEY --env staging
+   npx wrangler secret put RESEND_API_KEY --env staging
    # İsteğe bağlı: GOOGLE_PLAY_SERVICE_ACCOUNT_JSON, PLAY_RTDN_TOKEN,
    # FIREBASE_SERVICE_ACCOUNT_JSON, APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY
    ```

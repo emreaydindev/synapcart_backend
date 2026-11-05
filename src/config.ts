@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { MAX_ITERATIONS, MIN_ITERATIONS } from "./lib/password";
 
 const list = (v: string | undefined, fallback: string[]): string[] =>
   v === undefined ? fallback : v.split(",").map((s) => s.trim()).filter(Boolean);
@@ -10,6 +11,7 @@ export interface Settings {
   corsOrigins: string[];
   frontendUrl: string;
   emailFrom: string;
+  passwordIterations: number;
   accessTokenMinutes: number;
   resetTokenHours: number;
   deleteTokenHours: number;
@@ -41,6 +43,7 @@ export function settings(env: Env): Settings {
     corsOrigins: list(env.CORS_ORIGINS, ["https://synapcart.emreaydin.dev", "http://localhost:3000"]),
     frontendUrl: (env.APP_FRONTEND_URL || "https://synapcart.emreaydin.dev").replace(/\/$/, ""),
     emailFrom: env.EMAIL_FROM || "noreply@synapcart.emreaydin.dev",
+    passwordIterations: Math.min(MAX_ITERATIONS, Math.max(MIN_ITERATIONS, Number(env.PASSWORD_ITERATIONS) || MAX_ITERATIONS)),
     accessTokenMinutes: Number(env.ACCESS_TOKEN_EXPIRE_MINUTES) || 60 * 24 * 7,
     resetTokenHours: 1,
     deleteTokenHours: 24,

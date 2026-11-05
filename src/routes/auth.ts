@@ -4,7 +4,7 @@ import { rateLimit } from "../context";
 import { getUserByEmail, updateUser, deleteUser, type UserRow } from "../db";
 import { settings } from "../config";
 import { ApiError, badRequest } from "../lib/errors";
-import { hashPassword, verifyPassword } from "../lib/password";
+import { hashPassword, needsRehash, verifyPassword } from "../lib/password";
 import { createAccessToken } from "../lib/security";
 import { randomToken, sha256Hex } from "../lib/crypto";
 import { HOUR, MINUTE, addMs, isPast, nowIso } from "../lib/time";
@@ -30,6 +30,10 @@ async function authenticate(c: Ctx, email: string, password: string): Promise<Us
   if (!user || !(await verifyPassword(password, user.hashed_password))) {
     throw new ApiError(401, "Hatalı email veya şifre.");
   }
+  const iterations = settings(c.env).passwordIterations;
+  if (needsRehash(user.hashed_password, iterations)) {
+    return updateUser(c.env.DB, user.id, { hashed_password: await hashPassword(password, iterations) });
+  }
   return user;
 }
 
@@ -44,7 +48,7 @@ auth.post("/register", rateLimit("AUTH_LIMITER", "register"), async (c) => {
   if (await getUserByEmail(c.env.DB, body.email)) throw badRequest("Bu email zaten kayıtlı.");
   const id = crypto.randomUUID();
   await c.env.DB.prepare("INSERT INTO users (id, email, hashed_password, full_name, created_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(id, body.email, await hashPassword(body.password), body.name, nowIso())
+    .bind(id, body.email, await hashPassword(body.password, settings(c.env).passwordIterations), body.name, nowIso())
     .run();
   const user = (await getUserByEmail(c.env.DB, body.email))!;
   return c.json(await profileResponse(c.env, user), 201);
@@ -92,7 +96,7 @@ auth.post("/reset-password", rateLimit("AUTH_LIMITER", "reset"), async (c) => {
     throw badRequest("Şifre sıfırlama linkinin süresi dolmuş.");
   }
   await updateUser(c.env.DB, user.id, {
-    hashed_password: await hashPassword(body.new_password),
+    hashed_password: await hashPassword(body.new_password, settings(c.env).passwordIterations),
     reset_token: null,
     reset_token_expires: null,
     token_version: (user.token_version ?? 0) + 1,

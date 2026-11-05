@@ -2,7 +2,7 @@ import { decodeJwt } from "jose";
 import { describe, expect, it } from "vitest";
 import { outbox, type OutgoingEmail } from "../src/services/email";
 import { sha256Hex } from "../src/lib/crypto";
-import { api, env, json, registerAndLogin } from "./helpers";
+import { api, env, json, jsonResponse, mockFetch, registerAndLogin } from "./helpers";
 
 function captureEmails() {
   const sent: OutgoingEmail[] = [];
@@ -175,5 +175,44 @@ describe("auth", () => {
     expect(r.headers.get("access-control-allow-origin")).toBe("https://synapcart.emreaydin.dev");
     r = await api("/health", { headers: { Origin: "https://evil.example" } });
     expect(r.headers.get("access-control-allow-origin")).toBeNull();
+  });
+});
+
+describe("free-plan settings", () => {
+  const storedHash = async () =>
+    (await env.DB.prepare("SELECT hashed_password FROM users WHERE email = ?").bind("user@example.com").first<{ hashed_password: string }>())!
+      .hashed_password;
+
+  it("hashes with PASSWORD_ITERATIONS and rehashes on login when it changes", async () => {
+    await registerAndLogin();
+    expect((await storedHash()).split("$")[1]).toBe("25000");
+    const r = await api("/auth/login", { method: "POST", json: { email: "user@example.com", password: "secret123" } }, { PASSWORD_ITERATIONS: "100000" });
+    expect(r.status).toBe(200);
+    expect((await storedHash()).split("$")[1]).toBe("100000");
+    // The upgraded hash still verifies under the old setting.
+    expect((await api("/auth/login", { method: "POST", json: { email: "user@example.com", password: "secret123" } })).status).toBe(200);
+  });
+
+  it("sends email through Resend when RESEND_API_KEY is set", async () => {
+    await registerAndLogin();
+    const calls = mockFetch({ "https://api.resend.com/emails": () => jsonResponse({ id: "email_1" }) });
+    const r = await api("/auth/forgot-password", { method: "POST", json: { email: "user@example.com" } }, { RESEND_API_KEY: "re_test" });
+    expect(r.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].headers.get("authorization")).toBe("Bearer re_test");
+    const body = (await calls[0].json()) as { from: string; to: string[]; subject: string; html: string };
+    expect(body.from).toBe("SynapCart <noreply@synapcart.emreaydin.dev>");
+    expect(body.to).toEqual(["user@example.com"]);
+    expect(body.subject).toBe("SynapCart - Şifre Sıfırlama");
+    expect(body.html).toContain("/reset-password?token=");
+  });
+
+  it("keeps the generic reply when Resend fails", async () => {
+    await registerAndLogin();
+    mockFetch({ "https://api.resend.com/emails": () => jsonResponse({ message: "bad" }, 422) });
+    const r = await api("/auth/forgot-password", { method: "POST", json: { email: "user@example.com" } }, { RESEND_API_KEY: "re_test" });
+    expect(r.status).toBe(200);
+    const row = await env.DB.prepare("SELECT reset_token FROM users WHERE email = ?").bind("user@example.com").first<{ reset_token: string | null }>();
+    expect(row!.reset_token).toBeNull();
   });
 });

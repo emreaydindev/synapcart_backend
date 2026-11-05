@@ -1,8 +1,11 @@
 import { b64Decode, b64urlEncode, safeEqual } from "./crypto";
 
-// PBKDF2-SHA256 through WebCrypto (native, cheap on Workers CPU time).
-// 100k iterations is the maximum the Workers runtime accepts.
-const ITERATIONS = 100_000;
+// PBKDF2-SHA256 through WebCrypto. 100k iterations is the maximum the Workers runtime
+// accepts, but it costs ~20 ms of CPU, over the Workers Free 10 ms limit, so the count is
+// configurable (PASSWORD_ITERATIONS, see config.ts). Each hash stores its own count, and
+// login rehashes with `needsRehash` when the setting changes.
+export const MAX_ITERATIONS = 100_000;
+export const MIN_ITERATIONS = 10_000;
 const enc = new TextEncoder();
 
 async function derive(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<Uint8Array> {
@@ -12,10 +15,10 @@ async function derive(password: string, salt: Uint8Array<ArrayBuffer>, iteration
 }
 
 /** Stored as `pbkdf2_sha256$<iterations>$<salt b64url>$<hash b64url>`. */
-export async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string, iterations: number = MAX_ITERATIONS): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const hash = await derive(password, salt, ITERATIONS);
-  return `pbkdf2_sha256$${ITERATIONS}$${b64urlEncode(salt)}$${b64urlEncode(hash)}`;
+  const hash = await derive(password, salt, iterations);
+  return `pbkdf2_sha256$${iterations}$${b64urlEncode(salt)}$${b64urlEncode(hash)}`;
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
@@ -27,4 +30,9 @@ export async function verifyPassword(password: string, stored: string): Promise<
   } catch {
     return false;
   }
+}
+
+/** True when the stored hash uses a different iteration count than the current setting. */
+export function needsRehash(stored: string, iterations: number): boolean {
+  return Number(stored.split("$")[1]) !== iterations;
 }

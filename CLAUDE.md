@@ -10,7 +10,7 @@ SynapCart backend: a TypeScript **Cloudflare Worker** (Hono) on **D1**. It is th
 - Google Play **and** App Store subscription billing;
 - FCM price alerts (Android and iOS);
 - AI product comparison;
-- password-reset and account-deletion email (Cloudflare Email Service).
+- password-reset and account-deletion email (Resend HTTP API; the Cloudflare Email Service binding is a fallback for Workers Paid).
 
 Its clients are the mobile apps (`synapcart_mobile`: a shared KMP module plus Android Compose and iOS SwiftUI apps) and the Next.js web portal (`synapcart_web`). All three repos are submodules of the `synapcart` umbrella repo. Production is `https://api.synapcart.emreaydin.dev`; staging is `https://staging-api.synapcart.emreaydin.dev`.
 
@@ -46,7 +46,7 @@ Port **8001** is the local convention; the apps' debug builds and the web portal
   - `search.ts` covers SerpAPI and the Cache API.
   - `plan.ts` holds the limits and quota.
   - `chat.ts` covers history and saving messages.
-  - `email.ts` holds the templates and the `send_email` call.
+  - `email.ts` holds the templates and sends through Resend (`RESEND_API_KEY`), else the `SEND_EMAIL` binding, else logs.
   - `google.ts` mints service-account tokens with `jose`.
   - `push.ts` sends FCM v1.
   - `playBilling.ts` and `appleBilling.ts` handle store billing.
@@ -71,7 +71,7 @@ Port **8001** is the local convention; the apps' debug builds and the web portal
   - Bumping `token_version` (password reset or change) revokes every token.
   - Emails are lowercased and compared case-insensitively (`COLLATE NOCASE`).
   - Password rules: 8–72 bytes, letters and digits.
-  - Passwords are hashed with PBKDF2-SHA256 at 100k iterations (the Workers maximum) in the format `pbkdf2_sha256$iter$salt$hash`.
+  - Passwords are hashed with PBKDF2-SHA256 at `PASSWORD_ITERATIONS` (10k–100k, default 100k; `wrangler.jsonc` sets 25k to fit the Workers Free 10 ms CPU limit) in the format `pbkdf2_sha256$iter$salt$hash`. Login rehashes when the stored count differs from the setting.
   - `/auth/token` is a form login, disabled in prod.
 - **Reset and deletion links**
   - Tokens are stored as SHA-256 hashes.
